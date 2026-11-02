@@ -80,21 +80,44 @@ export function overlapsAny(x: number, y: number, z: number, height: number, box
   return null;
 }
 
+function hits(b: Box, x: number, y: number, z: number, height: number): boolean {
+  return !b.decal && x - PLAYER_HALF_W < b.maxX && x + PLAYER_HALF_W > b.minX && y < b.maxY && y + height > b.minY && z - PLAYER_HALF_W < b.maxZ && z + PLAYER_HALF_W > b.minZ;
+}
+
+/**
+ * Lo que viaja por la red va redondeado a centímetros: se puede arrancar unos
+ * milímetros adentro de una caja, y eso no tiene que contar como estar adentro.
+ */
+const FACE_TOLERANCE = 0.02;
+
+/**
+ * Un eje a la vez, contra TODAS las cajas: sólo frena la caja cuya cara se cruzó
+ * en este paso, y frena justo ahí. Así dos cajas que se tocan no dejan a nadie
+ * adentro de la segunda, rozar una pared con unos milímetros de redondeo no tira
+ * a la otra punta, y del que ya está adentro (un zombi empujado por otro) se sale
+ * caminando, sin teletransportes.
+ */
 function moveXZ(p: Body, dx: number, dz: number, height: number, boxes: readonly Box[]): boolean {
   let blocked = false;
   if (dx !== 0) {
+    const from = p.x;
     p.x += dx;
-    const b = overlapsAny(p.x, p.y, p.z, height, boxes);
-    if (b) {
+    for (const b of boxes) {
+      if (!hits(b, p.x, p.y, p.z, height)) continue;
+      const crossed = dx > 0 ? from + PLAYER_HALF_W <= b.minX + FACE_TOLERANCE : from - PLAYER_HALF_W >= b.maxX - FACE_TOLERANCE;
+      if (!crossed) continue;
       p.x = dx > 0 ? b.minX - PLAYER_HALF_W - SKIN : b.maxX + PLAYER_HALF_W + SKIN;
       p.vx = 0;
       blocked = true;
     }
   }
   if (dz !== 0) {
+    const from = p.z;
     p.z += dz;
-    const b = overlapsAny(p.x, p.y, p.z, height, boxes);
-    if (b) {
+    for (const b of boxes) {
+      if (!hits(b, p.x, p.y, p.z, height)) continue;
+      const crossed = dz > 0 ? from + PLAYER_HALF_W <= b.minZ + FACE_TOLERANCE : from - PLAYER_HALF_W >= b.maxZ - FACE_TOLERANCE;
+      if (!crossed) continue;
       p.z = dz > 0 ? b.minZ - PLAYER_HALF_W - SKIN : b.maxZ + PLAYER_HALF_W + SKIN;
       p.vz = 0;
       blocked = true;
@@ -103,20 +126,26 @@ function moveXZ(p: Body, dx: number, dz: number, height: number, boxes: readonly
   return blocked;
 }
 
-/** Mueve en Y. Devuelve 1 si apoyó en algo, -1 si pegó con la cabeza, 0 si nada. */
+/** Mueve en Y, con la misma regla. Devuelve 1 si apoyó en algo, -1 si pegó con la cabeza, 0 si nada. */
 function moveY(p: Body, dy: number, height: number, boxes: readonly Box[]): number {
   if (dy === 0) return 0;
+  const from = p.y;
   p.y += dy;
-  const b = overlapsAny(p.x, p.y, p.z, height, boxes);
-  if (!b) return 0;
-  if (dy < 0) {
-    p.y = b.maxY + SKIN;
+  let result = 0;
+  for (const b of boxes) {
+    if (!hits(b, p.x, p.y, p.z, height)) continue;
+    if (dy < 0) {
+      if (from < b.maxY - FACE_TOLERANCE) continue;
+      p.y = b.maxY + SKIN;
+      result = 1;
+    } else {
+      if (from + height > b.minY + FACE_TOLERANCE) continue;
+      p.y = b.minY - height - SKIN;
+      result = -1;
+    }
     p.vy = 0;
-    return 1;
   }
-  p.y = b.minY - height - SKIN;
-  p.vy = 0;
-  return -1;
+  return result;
 }
 
 /**
