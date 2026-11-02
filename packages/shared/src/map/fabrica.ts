@@ -307,8 +307,8 @@ function build(): GameMap {
   boxes.push(box(25.2, 0, -23.5, 28.5, 0.9, -22.5, TEX_METAL));
   boxes.push(box(16, 0, -18, 20.4, 0.5, -15.8, TEX_RUST));
   boxes.push(box(16.6, 0.5, -17.6, 19.8, 1.4, -16.2, TEX_CONTAINER));
-  boxes.push(crate(27.5, -11, 1.2));
-  boxes.push(crate(27.5, -11, 1.0, 1.2, TEX_WOOD));
+  boxes.push(crate(23.5, -10.2, 1.2));
+  boxes.push(crate(23.5, -10.2, 1.0, 1.2, TEX_WOOD));
   boxes.push(box(9, 0, -12, 10.4, 1.1, -10.6, TEX_METAL));
   boxes.push(barrel(9.8, -14));
   boxes.push(barrel(10.5, -14.4));
@@ -318,7 +318,7 @@ function build(): GameMap {
   boxes.push(box(2.5, 0, -12, 5.5, 0.9, -5, TEX_LAB));
   boxes.push(box(-1.2, 0, -8, 1.2, 0.9, -4, TEX_LAB));
   for (const x of [-5.5, 5.5]) boxes.push({ ...box(x - 0.7, 0, -20.7, x + 0.7, 2.8, -19.3, TEX_METAL), shape: "cyl" });
-  boxes.push(box(-2.5, 0, -23.5, 2.5, 0.3, -19.5, TEX_CONCRETE));
+  boxes.push(box(-2.5, 0, -22.2, 2.5, 0.3, -19.5, TEX_CONCRETE));
   boxes.push(pillar(-3, -15, ROOF_Y, 0.4));
   boxes.push(pillar(3, -15, ROOF_Y, 0.4));
 
@@ -353,13 +353,13 @@ function build(): GameMap {
   boxes.push(barrel(36, 22));
 
   // ---- Zombis que salen del piso adentro de las salas (no en la oficina).
-  spawners.push({ zone: 1, x: -20, y: 0, z: 8.5 }, { zone: 1, x: -12, y: 0, z: -3 });
-  spawners.push({ zone: 2, x: 16, y: 0, z: 10 }, { zone: 2, x: 24, y: 0, z: 1 });
+  spawners.push({ zone: 1, x: -20, y: 0, z: 8.5 }, { zone: 1, x: -13.5, y: 0, z: -3 });
+  spawners.push({ zone: 2, x: 13, y: 0, z: 10 }, { zone: 2, x: 24, y: 0, z: 1 });
   spawners.push({ zone: 3, x: -22, y: 0, z: -12 });
   spawners.push({ zone: 4, x: 24, y: 0, z: -19 });
   spawners.push({ zone: 5, x: 0, y: 0, z: -9 }, { zone: 5, x: 0, y: 0, z: -16 });
-  spawners.push({ zone: 6, x: -36, y: 0, z: -3 }, { zone: 6, x: -36, y: 0, z: 11 });
-  spawners.push({ zone: 7, x: 36, y: 0, z: 5 }, { zone: 7, x: 40, y: 0, z: 10 });
+  spawners.push({ zone: 6, x: -36, y: 0, z: -3 }, { zone: 6, x: -36, y: 0, z: 5.7 });
+  spawners.push({ zone: 7, x: 38.5, y: 0, z: 7 }, { zone: 7, x: 40, y: 0, z: 10 });
 
   // ---- Lo que se compra.
   const wallWeapons: WallWeapon[] = [
@@ -379,7 +379,7 @@ function build(): GameMap {
     { x: 20, z: 15, yaw: 0, zone: 2 },
     { x: 13, z: -20, yaw: -Math.PI / 2, zone: 4 },
     { x: -15, z: -11, yaw: Math.PI, zone: 3 },
-    { x: -36.5, z: 11, yaw: 0, zone: 6 },
+    { x: -35, z: 11, yaw: 0, zone: 6 },
     { x: 36, z: -1, yaw: 0, zone: 7 },
   ];
   const perks: PerkMachine[] = [

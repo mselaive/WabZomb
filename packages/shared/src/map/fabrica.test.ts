@@ -88,6 +88,22 @@ describe("La Fábrica", () => {
     expect(BOARD_MAX).toBe(6);
   });
 
+  it("ninguna máquina, caja ni lugar de aparición queda adentro de un mueble", () => {
+    // Lo bajo (tarimas, hasta un escalón) no cuenta: se pisa.
+    const inside = (x: number, z: number, hw: number, hd: number) =>
+      map.boxes.filter((b) => !b.decal && !b.hidden && b.maxY > 0.45 && b.minY < 2 && x + hw > b.minX && x - hw < b.maxX && z + hd > b.minZ && z - hd < b.maxZ);
+    for (const m of map.perks) expect(inside(m.x, m.z, 0.6, 0.6), `bebida ${m.perk}`).toEqual([]);
+    for (const b of map.boxSpots) expect(inside(b.x, b.z, 0.7, 0.7), `caja en ${b.x},${b.z}`).toEqual([]);
+    expect(inside(map.pap.x, map.pap.z, 0.9, 0.7), "Pack-a-Punch").toEqual([]);
+    expect(inside(map.power.x, map.power.z, 0.5, 0.3), "la luz").toEqual([]);
+    for (const s of map.spawners) if (s.barrier === undefined) expect(inside(s.x, s.z, 0.35, 0.35), `spawner en ${s.x},${s.z}`).toEqual([]);
+    // Donde cae el zombi al pasar la ventana no puede haber nada, ni bajo: quedaría metido adentro.
+    for (const b of map.barriers) {
+      const low = map.boxes.filter((o) => !o.decal && !o.hidden && o.maxY > 0.05 && o.minY < 2 && b.inside.x + 0.35 > o.minX && b.inside.x - 0.35 < o.maxX && b.inside.z + 0.35 > o.minZ && b.inside.z - 0.35 < o.maxZ);
+      expect(low, `ventana ${b.id}`).toEqual([]);
+    }
+  });
+
   it("la grilla se arma en un tiempo razonable", () => {
     const t0 = performance.now();
     buildNavGrid(map);
