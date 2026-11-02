@@ -1,0 +1,33 @@
+{
+  "name": "wabzomb",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "predev": "node scripts/check-node.mjs",
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace @wabzomb/server",
+    "dev:client": "npm run dev --workspace @wabzomb/client",
+    "build": "npm run build --workspace @wabzomb/client",
+    "deploy:server": "npm run deploy --workspace @wabzomb/server",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "npm run typecheck --workspace @wabzomb/shared && npm run typecheck --workspace @wabzomb/server && npm run typecheck --workspace @wabzomb/client",
+    "smoke": "node scripts/smoke-build.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "concurrently": "^9.1.2",
+    "playwright": "^1.64.1",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

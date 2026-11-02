@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WabZomb</title>
+    <meta name="description" content="Zombis por rondas, de uno a cuatro, para jugar con amigos en el navegador: armas de pared, caja misteriosa, Pack-a-Punch y bebidas." />
+    <meta name="theme-color" content="#0b0d10" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Special+Elite&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="stage"></div>
+
+    <div id="hud" hidden>
+      <div id="damageVignette" class="vignette"></div>
+      <div id="lowHp" class="vignette low-hp" hidden></div>
+      <div id="downOverlay" class="down-overlay" hidden></div>
+      <div id="scope" class="scope" hidden><div class="scope-h"></div><div class="scope-v"></div></div>
+
+      <div id="damageDir" class="damage-dir" hidden></div>
+      <div id="crosshair" class="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
+      <div id="hitmarker" class="hitmarker"><i></i><i></i><i></i><i></i></div>
+
+      <div id="roundBox" class="round-box">
+        <div id="roundNumber" class="round-number">1</div>
+        <div id="roundLabel" class="round-label">RONDA</div>
+        <div id="zombiesLeft" class="zombies-left"></div>
+      </div>
+
+      <div id="fxBar" class="fx-bar"></div>
+
+      <div id="banner" class="banner" hidden></div>
+      <div id="subBanner" class="sub-banner" hidden></div>
+
+      <div id="usePrompt" class="use-prompt" hidden></div>
+      <div id="useBar" class="use-bar" hidden><div id="useFill"></div><span id="useText"></span></div>
+      <div id="pausePanel" class="pause" hidden>
+        <h2>Pausa</h2>
+        <p id="pauseHint" class="pause-hint"></p>
+        <label class="field">
+          <span>Volumen <small id="pauseVolumeValue"></small></span>
+          <input id="pauseVolumeInput" type="range" min="0" max="100" step="5" value="80" />
+        </label>
+        <label class="field">
+          <span>Sensibilidad del mouse <small id="pauseSensValue"></small></span>
+          <input id="pauseSensInput" type="range" min="2" max="40" step="1" value="11" />
+        </label>
+        <div class="field">
+          <span>Mira</span>
+          <div class="mode-row compact" role="radiogroup" aria-label="Mira">
+            <button class="mode-btn" type="button" role="radio" data-crosshair="dynamic">Dinámica</button>
+            <button class="mode-btn" type="button" role="radio" data-crosshair="static">Fija</button>
+            <button class="mode-btn" type="button" role="radio" data-crosshair="dot">Punto</button>
+          </div>
+          <div class="swatches" role="radiogroup" aria-label="Color de la mira">
+            <button class="swatch" type="button" role="radio" data-crosscolor="#7cff9b" style="--c: #7cff9b" title="Verde"></button>
+            <button class="swatch" type="button" role="radio" data-crosscolor="#ffffff" style="--c: #ffffff" title="Blanco"></button>
+            <button class="swatch" type="button" role="radio" data-crosscolor="#7fd3ff" style="--c: #7fd3ff" title="Celeste"></button>
+            <button class="swatch" type="button" role="radio" data-crosscolor="#ffe066" style="--c: #ffe066" title="Amarillo"></button>
+            <button class="swatch" type="button" role="radio" data-crosscolor="#ff5c5c" style="--c: #ff5c5c" title="Rojo"></button>
+          </div>
+        </div>
+        <label class="check"><input id="pauseFullscreen" type="checkbox" /> Pantalla completa (así Esc no suelta el mouse)</label>
+        <div class="pause-actions">
+          <button id="btnResume" class="btn btn-primary" type="button">Seguir jugando</button>
+          <button id="btnFullscreenOff" class="btn" type="button" hidden>Salir de pantalla completa</button>
+          <button id="btnPauseLeave" class="btn btn-ghost" type="button">Salir de la partida</button>
+        </div>
+      </div>
+
+      <div id="spectating" class="spectating" hidden></div>
+
+      <div class="bottom-left">
+        <div id="perks" class="perks"></div>
+        <div class="points-box"><span id="points" class="points">500</span><span id="pointsDelta" class="points-delta"></span></div>
+        <div class="vitals"><div class="hp-bar"><div id="hpFill"></div></div><span id="hpText">100</span></div>
+      </div>
+
+      <div id="mates" class="mates"></div>
+
+      <div class="ammo-box">
+        <div id="weaponName" class="weapon-name">M1911</div>
+        <div class="ammo"><span id="ammoMag">8</span><span class="ammo-sep">/</span><span id="ammoReserve">80</span></div>
+        <div id="slots" class="slots"></div>
+        <div class="slots nades"><span id="nades" class="slot">G ✸ 2</span></div>
+      </div>
+
+      <div id="teamChat" class="team-chat">
+        <ol id="teamChatLog" class="chat-log"></ol>
+        <input id="teamChatInput" maxlength="80" placeholder="Mensaje (Enter)" autocomplete="off" hidden />
+      </div>
+    </div>
+
+    <div id="scoreboard" class="scoreboard" hidden>
+      <h3 id="scoreboardTitle">Ronda 1</h3>
+      <table><tbody id="sbBody"></tbody></table>
+    </div>
+
+    <div id="overlay">
+      <section id="screenMenu" class="screen">
+        <h1 class="logo">Wab<span>Zomb</span></h1>
+        <p class="tagline">Zombis por rondas, de uno a cuatro. Comprá puertas, armas de pared, la caja, bebidas, mejorá en el Pack-a-Punch y aguantá lo que puedas.</p>
+
+        <p id="inviteHint" class="invite-hint" hidden></p>
+
+        <label class="field">
+          <span>Tu nombre</span>
+          <input id="nameInput" maxlength="14" placeholder="Jugador" autocomplete="off" />
+        </label>
+
+        <label class="field">
+          <span>Volumen <small id="volumeValue"></small></span>
+          <input id="volumeInput" type="range" min="0" max="100" step="5" value="80" />
+        </label>
+
+        <label class="field">
+          <span>Sensibilidad del mouse <small id="sensValue"></small></span>
+          <input id="sensInput" type="range" min="2" max="40" step="1" value="11" />
+        </label>
+
+        <div class="field">
+          <span>Mira</span>
+          <div class="mode-row compact" role="radiogroup" aria-label="Mira">
+            <button class="mode-btn" type="button" role="radio" data-crosshair="dynamic">Dinámica</button>
+            <button class="mode-btn" type="button" role="radio" data-crosshair="static">Fija</button>
+            <button class="mode-btn" type="button" role="radio" data-crosshair="dot">Punto</button>
+          </div>
+          <div class="swatches" role="radiogroup" aria-label="Color de la mira">
+            <button class="swatch" type="button" role="radio" data-crosscolor="#7cff9b" style="--c: #7cff9b" title="Verde"></button>
+            <button class="swatch" type="button" role="radio" data-crosscolor="#ffffff" style="--c: #ffffff" title="Blanco"></button>
+            <button class="swatch" type="button" role="radio" data-crosscolor="#7fd3ff" style="--c: #7fd3ff" title="Celeste"></button>
+            <button class="swatch" type="button" role="radio" data-crosscolor="#ffe066" style="--c: #ffe066" title="Amarillo"></button>
+            <button class="swatch" type="button" role="radio" data-crosscolor="#ff5c5c" style="--c: #ff5c5c" title="Rojo"></button>
+          </div>
+        </div>
+
+        <label class="check" title="En pantalla completa el navegador nos deja quedarnos con la tecla Esc: abre la pausa en vez de soltar el mouse">
+          <input id="fullscreenInput" type="checkbox" /> Pantalla completa al jugar (así Esc no suelta el mouse)
+        </label>
+
+        <div id="menuActions" class="menu-actions">
+          <button id="btnSolo" class="btn btn-primary">Jugar solo</button>
+          <button id="btnCreate" class="btn">Crear sala para amigos</button>
+          <div class="join-row">
+            <input id="codeInput" class="code-input" maxlength="6" placeholder="CÓDIGO" autocomplete="off" spellcheck="false" />
+            <button id="btnJoin" class="btn">Unirse</button>
+          </div>
+        </div>
+
+        <p id="menuError" class="error" hidden></p>
+
+        <details class="help">
+          <summary>Controles</summary>
+          <ul>
+            <li><b>WASD</b> — moverse · <b>Shift</b> — caminar · <b>Ctrl</b> / <b>C</b> — agacharse · <b>Espacio</b> — saltar</li>
+            <li><b>Mouse</b> — mirar · <b>Click izquierdo</b> — disparar · <b>Click derecho</b> — mira (los que tienen)</li>
+            <li><b>R</b> — recargar · <b>1</b> / <b>2</b> / <b>3</b> — armas · <b>Q</b> — la última arma · <b>F</b> — mirar el arma</li>
+            <li><b>V</b> (o rueda del mouse) — cuchillo · <b>G</b> — granada</li>
+            <li><b>E</b> — comprar, abrir puertas, reparar ventanas (sostener), revivir (sostener)</li>
+            <li><b>Tab</b> — tabla · <b>Enter</b> — chat · <b>Esc</b> — pausa</li>
+          </ul>
+        </details>
+
+        <details class="help">
+          <summary>Cómo se juega</summary>
+          <ul>
+            <li>Los zombis vienen por <b>rondas</b>, cada vez más y más fuertes. Entran por las ventanas (arrancan las tablas) o salen del piso.</li>
+            <li>Todo se paga con <b>puntos</b>: 10 por tiro, 60 por baja (100 en la cabeza, 130 con el cuchillo), 10 por tabla reparada.</li>
+            <li>Las <b>puertas</b> abren zonas nuevas. La <b>caja misteriosa</b> (950) da un arma al azar; a veces sale el osito y se muda.</li>
+            <li>Hay que prender <b>la luz</b> para las bebidas y el <b>Pack-a-Punch</b> (5000): el arma vuelve mejorada, con otro nombre.</li>
+            <li><b>Bebidas</b>: Juggernog (250 de vida), Speed Cola, Double Tap, Quick Revive, Stamin-Up, Mule Kick. Caerse las saca todas.</li>
+            <li>Dos manotazos te tiran. Un compañero te levanta con E; solo, Quick Revive te levanta a vos. Si caen todos, se terminó.</li>
+          </ul>
+        </details>
+      </section>
+
+      <section id="screenLobby" class="screen" hidden>
+        <h2>Sala</h2>
+        <button id="roomCode" class="room-code" title="Copiar link de invitación">------</button>
+        <p class="hint">Tocá el código para copiar el link e invitá hasta tres amigos.</p>
+
+        <ul id="playerList" class="player-list"></ul>
+
+        <div id="mapRow" class="mode-row" role="radiogroup" aria-label="Mapa">
+          <span class="mode-label">Mapa</span>
+        </div>
+
+        <div class="lobby-actions">
+          <button id="btnReady" class="btn btn-primary">Estoy listo</button>
+          <button id="btnStart" class="btn" hidden>Empezar ya</button>
+          <button id="btnLeave" class="btn btn-ghost">Salir</button>
+        </div>
+        <p id="lobbyHint" class="hint"></p>
+        <div class="lobby-chat">
+          <ol id="chatLog" class="chat-log" aria-live="polite"></ol>
+          <form id="chatForm" class="chat-form">
+            <input id="chatInput" maxlength="80" placeholder="Escribile algo a la sala" autocomplete="off" />
+            <button class="btn btn-small" type="submit">Mandar</button>
+          </form>
+        </div>
+        <p id="nextMatch" class="next-match" hidden></p>
+      </section>
+
+      <section id="screenResult" class="screen" hidden>
+        <h2 id="resultTitle">Se terminó</h2>
+        <p id="resultSubtitle" class="tagline"></p>
+        <div id="resultTable" class="result-table"></div>
+        <p class="hint">Volviendo a la sala...</p>
+      </section>
+
+      <section id="screenConnecting" class="screen" hidden>
+        <h2>Conectando...</h2>
+        <p class="tagline">Buscando la sala.</p>
+      </section>
+    </div>
+
+    <div id="reconnecting" class="reconnecting" role="status" hidden>Se cortó la conexión. Reconectando<span class="dots"></span></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
