@@ -35,6 +35,8 @@ export function createPlayer(id: number): PlayerState {
     regenAt: 0,
     tagged: 0,
     fallImpact: 0,
+    invulnTicks: 0,
+    drinkTicks: 0,
     slots: [M1911, -1, -1],
     ammo: [8, 0, 0],
     reserve: [80, 0, 0],
@@ -89,6 +91,7 @@ export function createGameState(): GameState {
     fireSale: 0,
     radios: 0,
     songTicks: 0,
+    egg: 0,
     reachedRound: 0,
     seed: 1,
     mapIndex: 0,
@@ -129,8 +132,9 @@ function stepPlayerInput(state: GameState, p: PlayerState, input: PlayerInput, m
 
   if (stepMelee(p, input, acting)) resolveMelee(state, p, input.seq, events);
 
+  // Caído también se dispara (con la pistola, como en el original): es la única defensa.
   const wasReloading = p.reloading;
-  const fired = stepWeaponState(p, input, acting && !p.down);
+  const fired = stepWeaponState(p, input, acting);
   if (!wasReloading && p.reloading) events.push({ t: "reload", byId: p.id, x: p.x, y: p.y, z: p.z });
   if (fired >= 0) resolveShot(state, p, fired, input.seq, shotRewind(state.tick, input.view), boxes, events);
 }
@@ -160,7 +164,7 @@ export function step(state: GameState, inputs: ReadonlyMap<number, PlayerInput[]
   stepZombies(state, map, boxes, events);
   stepPowerUps(state, events);
   stepMachines(state, map, events);
-  stepPlayerStatus(state, events);
+  stepPlayerStatus(state, events, boxes);
 
   for (const p of state.players) if (p.alive) recordTrail(p, state.tick);
 

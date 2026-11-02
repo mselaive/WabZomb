@@ -1,4 +1,4 @@
-import { KNIFE, RAYGUN, weapon } from "@wabzomb/shared";
+import { KNIFE, RAYGUN, THUNDERGUN, weapon } from "@wabzomb/shared";
 
 /**
  * Sonido generado por código (sin archivos): tiros por clase de arma, zombis
@@ -105,6 +105,13 @@ export class Audio {
     const { gain, pan } = this.spatial(x, z, 6);
     const own = x === null;
     const g = (own ? 0.55 : 0.8) * gain;
+    if (weaponId === THUNDERGUN) {
+      // Un trueno: grave, con un soplido largo.
+      this.noise(0.6, 300, g * 1.3, pan);
+      this.tone(50, 0.7, g * 0.8, pan, "sawtooth", 25);
+      this.noise(0.9, 1800, g * 0.5, pan, "bandpass", 0.6);
+      return;
+    }
     if (weaponId === RAYGUN) {
       this.tone(pap ? 420 : 520, 0.22, g * 0.5, pan, "sawtooth", pap ? 90 : 140);
       this.tone(1400, 0.1, g * 0.2, pan, "square", 300);

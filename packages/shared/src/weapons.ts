@@ -70,6 +70,8 @@ export interface WeaponDef {
   recoilSide: number;
   /** Radio de la explosión de cada tiro (la Ray Gun), o 0. */
   explosive: number;
+  /** Un soplido en cono que mata a todos los que agarra (la Thunder Gun): hasta dónde llega, o 0. */
+  blast?: number;
   /** La versión mejorada (Pack-a-Punch). */
   pap: {
     name: string;
@@ -79,6 +81,7 @@ export interface WeaponDef {
     explosive?: number;
     auto?: boolean;
     fireTicks?: number;
+    blast?: number;
   };
   look: WeaponLook;
 }
@@ -120,6 +123,8 @@ export const L96 = 21;
 export const DRAGUNOV = 22;
 export const RAYGUN = 23;
 export const FRAG = 24;
+/** Se arma con las piezas del easter egg: no está en la pared ni en la caja. */
+export const THUNDERGUN = 25;
 /** Pseudoarmas de los eventos: caída y manotazo de zombi. */
 export const FALL_WEAPON = 30;
 export const ZOMBIE_WEAPON = 31;
@@ -302,6 +307,13 @@ export const WEAPONS: readonly WeaponDef[] = [
     pap: { name: "Granada", damage: 0, mag: 0, reserve: 0 },
     look: { body: 0.1, barrel: 0, color: OLIVE, wood: OLIVE, mag: "none", magLen: 0, stock: "none" },
   }),
+  W({
+    id: THUNDERGUN, name: "Thunder Gun", short: "Thunder", cls: "wonder", wall: 0, box: 0,
+    damage: 0, head: 1, range: 1, mag: 2, reserve: 12, fireTicks: 16, reloadTicks: 70, drawTicks: 10, auto: false, pellets: 1,
+    spread: 0, spreadShot: 0, spreadMove: 0, speed: 4.8, zoom: 0, kick: 0.08, recoilUp: 0.05, recoilSide: 0, explosive: 0, blast: 9,
+    pap: { name: "Zeus Cannon", damage: 0, mag: 4, reserve: 24, blast: 13 },
+    look: { body: 0.36, barrel: 0.3, color: 0x6b6f75, wood: 0x2a2d31, mag: "none", magLen: 0, stock: "poly", glow: 0x9ad0ff },
+  }),
 ];
 
 export function weapon(id: number): WeaponDef {
@@ -332,11 +344,12 @@ export interface WeaponStats {
   explosive: number;
   auto: boolean;
   fireTicks: number;
+  blast: number;
 }
 
 export function weaponStats(id: number, pap: boolean): WeaponStats {
   const w = weapon(id);
-  if (!pap) return { name: w.name, damage: w.damage, mag: w.mag, reserve: w.reserve, explosive: w.explosive, auto: w.auto, fireTicks: w.fireTicks };
+  if (!pap) return { name: w.name, damage: w.damage, mag: w.mag, reserve: w.reserve, explosive: w.explosive, auto: w.auto, fireTicks: w.fireTicks, blast: w.blast ?? 0 };
   return {
     name: w.pap.name,
     damage: w.pap.damage,
@@ -345,6 +358,7 @@ export function weaponStats(id: number, pap: boolean): WeaponStats {
     explosive: w.pap.explosive ?? w.explosive,
     auto: w.pap.auto ?? w.auto,
     fireTicks: w.pap.fireTicks ?? w.fireTicks,
+    blast: w.pap.blast ?? w.blast ?? 0,
   };
 }
 

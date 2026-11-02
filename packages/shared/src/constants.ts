@@ -53,7 +53,8 @@ export const REGEN_PER_TICK = 5;
 
 export const GRAVITY = 20;
 export const JUMP_SPEED = 7.3;
-export const WALK_FACTOR = 0.52;
+/** Correr (Shift, hacia adelante): más rápido, sin poder disparar. */
+export const SPRINT_FACTOR = 1.32;
 export const CROUCH_FACTOR = 0.34;
 export const GROUND_ACCEL = 14;
 export const GROUND_FRICTION = 10;
@@ -79,8 +80,12 @@ export const REVIVE_RANGE = 1.8;
 /** Solo con Quick Revive: te levantás vos a los pocos segundos (hasta 3 veces por partida). */
 export const SOLO_REVIVE_TICKS = 5 * TICK_RATE;
 export const SOLO_REVIVE_MAX = 3;
-/** El que vuelve se levanta con esta vida. */
+/** El que vuelve se levanta con esta vida, y estos ticks sin que lo puedan tocar (los zombis cerca salen empujados). */
 export const REVIVE_HP = 50;
+export const REVIVE_INVULN_TICKS = 50;
+export const REVIVE_PUSH_RANGE = 3.5;
+/** Con un caído al que nadie más puede defender, los zombis se quedan a esta distancia esperando. */
+export const ZOMBIE_WAIT_RANGE = 2.4;
 
 // ------------------------------------------------------------ puntos
 
@@ -174,6 +179,8 @@ export const PAP_TAKE_TICKS = 15 * TICK_RATE;
 export const WALL_AMMO_FACTOR = 0.5;
 export const PAP_AMMO_PRICE = 4500;
 export const PERK_MAX = 4;
+/** Tomar la bebida lleva esto: sin disparar mientras tanto. */
+export const DRINK_TICKS = 50;
 
 /** Las bebidas. */
 export const PERK_JUGG = 0;
@@ -243,7 +250,8 @@ export const BTN_SHOOT = 1;
 export const BTN_RELOAD = 2;
 export const BTN_JUMP = 4;
 export const BTN_CROUCH = 8;
-export const BTN_WALK = 16;
+/** Shift: correr. */
+export const BTN_SPRINT = 16;
 export const BTN_SCOPE = 32;
 /** E: usar (comprar, reparar, revivir). */
 export const BTN_USE = 64;
@@ -266,6 +274,23 @@ export const ZONE_LEGS = 2;
 export const FOV = 75;
 export const FOV_SCOPED = 22;
 
-/** Tres radios escondidas: encontrarlas y prenderlas (E) hace sonar la canción. */
+
+/**
+ * El easter egg: tres radios escondidas (E) hacen sonar la canción y abren el
+ * armario con la primera pieza; la segunda está arriba de un contenedor; la
+ * tercera la da la caja cuando ya se tienen las otras dos. Con las tres, en el
+ * banco del taller se arma la Thunder Gun.
+ */
 export const EGG_RADIOS = 3;
 export const EGG_SONG_TICKS = 70 * TICK_RATE;
+export const EGG_SONG = 1;
+export const EGG_PART_A = 2;
+export const EGG_PART_B = 4;
+export const EGG_PART_C = 8;
+export const EGG_BUILT = 16;
+export const EGG_PART_NAMES = ["el núcleo", "la bobina", "el gatillo"] as const;
+/** La caja ofrece la pieza con este "arma". */
+export const BOX_PART_ITEM = -5;
+/** La Thunder Gun: hasta dónde llega el soplido y qué tan ancho (coseno del medio ángulo). */
+export const THUNDER_RANGE = 9;
+export const THUNDER_COS = 0.82;

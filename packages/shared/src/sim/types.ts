@@ -12,7 +12,8 @@ export interface PlayerInput {
   reload: boolean;
   jump: boolean;
   crouch: boolean;
-  walk: boolean;
+  /** Shift: correr (hacia adelante). */
+  sprint: boolean;
   scope: boolean;
   /** E: usar lo que tenga adelante (comprar, reparar, revivir). */
   use: boolean;
@@ -66,6 +67,10 @@ export interface PlayerState extends Body {
   /** Ticks que le quedan frenado por un golpe. */
   tagged: number;
   fallImpact: number;
+  /** Recién levantado: estos ticks no lo tocan. */
+  invulnTicks: number;
+  /** Tomando una bebida: estos ticks sin disparar. */
+  drinkTicks: number;
 
   slots: Slots;
   ammo: Slots;
@@ -224,6 +229,8 @@ export interface GameState {
   /** Radios prendidas (bits) y cuánto queda de canción. */
   radios: number;
   songTicks: number;
+  /** El easter egg: bits EGG_*. Las piezas son de todos. */
+  egg: number;
   /** A qué ronda llegaron (cuando termina). */
   reachedRound: number;
   seed: number;
@@ -276,4 +283,6 @@ export type SimEvent =
   /** Un zombi que sale del piso, arranca una tabla, o pasa la ventana (para el sonido). */
   | { t: "zombie"; what: "rise" | "tear" | "vault" | "groan"; id: number; x: number; y: number; z: number }
   | { t: "radio"; byId: number; which: number; all: boolean }
+  /** El easter egg avanza: una pieza agarrada (0, 1, 2), o la Thunder Gun armada (3). */
+  | { t: "egg"; byId: number; step: number }
   | { t: "gameover"; round: number };

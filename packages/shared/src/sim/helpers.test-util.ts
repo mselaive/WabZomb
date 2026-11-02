@@ -15,7 +15,7 @@ export const input = (over: Partial<PlayerInput> = {}): PlayerInput => ({
   reload: false,
   jump: false,
   crouch: false,
-  walk: false,
+  sprint: false,
   scope: false,
   use: false,
   melee: false,

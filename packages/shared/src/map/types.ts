@@ -47,6 +47,8 @@ export interface Door {
   price: number;
   box: Box;
   zones: [number, number];
+  /** No se compra: la abre el easter egg (las tres radios). */
+  locked?: boolean;
 }
 
 /**
@@ -116,6 +118,10 @@ export interface GameMap {
   power: Place;
   /** Las radios escondidas del easter egg. */
   radios: { x: number; y: number; z: number; yaw: number }[];
+  /** Las piezas de la Thunder Gun que están en el mapa (la A en el armario, la B arriba de algo); la C la da la caja. */
+  eggParts: { x: number; y: number; z: number }[];
+  /** El banco donde se arma. */
+  bench: Place;
   bounds: { minX: number; minZ: number; maxX: number; maxZ: number };
   sky: number;
 }

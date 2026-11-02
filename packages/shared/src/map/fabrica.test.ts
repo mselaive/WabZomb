@@ -82,7 +82,7 @@ describe("La Fábrica", () => {
     expect(zoneAt(map, map.power.x, map.power.z)).toBe(map.power.zone);
     for (const d of map.doors) {
       const [a, b] = d.zones;
-      expect(a).not.toBe(b);
+      if (!d.locked) expect(a).not.toBe(b);
     }
     expect(new Set(map.perks.map((m) => m.perk)).size).toBe(6);
     expect(BOARD_MAX).toBe(6);

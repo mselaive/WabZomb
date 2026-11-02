@@ -15,6 +15,7 @@ import {
   TEX_FENCE,
   TEX_METAL,
   TEX_WOOD,
+  BOX_PART_ITEM,
   BOX_POOL,
   weapon,
   weaponStats,
@@ -184,6 +185,8 @@ export class World {
   private boxTeddy: THREE.Group | null = null;
   private powerLever: THREE.Mesh | null = null;
   private radioMeshes: THREE.Group[] = [];
+  private partMeshes: THREE.Group[] = [];
+  private benchGroup: THREE.Group | null = null;
   readonly moon: THREE.DirectionalLight;
   private sky: THREE.Mesh | null = null;
   private map: GameMap | null = null;
@@ -263,6 +266,7 @@ export class World {
     this.buildBox(map);
     this.buildPower(map);
     this.buildRadios(map);
+    this.buildEgg(map);
     this.buildLamps(map);
   }
 
@@ -303,7 +307,7 @@ export class World {
         }
       }
       // El precio flotando.
-      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(`${d.name} · ${d.price}`, "#ffd27a", 512, 30), transparent: true, depthTest: false }));
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(d.locked ? `${d.name} · con llave` : `${d.name} · ${d.price}`, "#ffd27a", 512, 30), transparent: true, depthTest: false }));
       label.scale.set(2.6, 0.33, 1);
       label.position.set((b.minX + b.maxX) / 2, b.maxY + 0.3, (b.minZ + b.maxZ) / 2);
       g.add(label);
@@ -496,6 +500,46 @@ export class World {
     }
   }
 
+  /** Las piezas de la Thunder Gun que están en el mapa, y el banco con su cartel. */
+  private buildEgg(map: GameMap): void {
+    this.partMeshes = [];
+    map.eggParts.forEach((p, i) => {
+      const g = buildPart(i, this.puffTex);
+      g.position.set(p.x, p.y, p.z);
+      g.userData.baseY = p.y;
+      this.propGroup.add(g);
+      this.partMeshes.push(g);
+    });
+    const b = map.bench;
+    const g = new THREE.Group();
+    const vise = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.2), this.materials[TEX_METAL]);
+    vise.position.set(0.4, 1.0, 0);
+    g.add(vise);
+    const tools = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.3), new THREE.MeshStandardMaterial({ color: 0x6b4a2a, roughness: 0.8 }));
+    tools.position.set(-0.35, 0.93, 0);
+    g.add(tools);
+    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture("Banco de trabajo", "#ffd27a", 384, 32), transparent: true, depthTest: false }));
+    label.scale.set(1.7, 0.28, 1);
+    label.position.y = 1.6;
+    g.add(label);
+    g.position.set(b.x, 0, b.z - 1.0);
+    g.rotation.y = b.yaw;
+    this.propGroup.add(g);
+    this.benchGroup = g;
+  }
+
+  /** Lo que ya se agarró desaparece. */
+  updateEgg(egg: number): void {
+    const bits = [2, 4];
+    this.partMeshes.forEach((g, i) => (g.visible = (egg & (bits[i] ?? 0)) === 0));
+    const t = performance.now() / 1000;
+    for (const g of this.partMeshes) {
+      if (!g.visible) continue;
+      g.rotation.y = t * 1.2;
+      g.position.y = g.userData.baseY + Math.sin(t * 2) * 0.04;
+    }
+  }
+
   private buildLamps(map: GameMap): void {
     this.zoneLamps = [];
     for (const zn of map.zones) {
@@ -608,7 +652,7 @@ export class World {
 
   private showBoxWeapon(wid: number): void {
     if (this.boxWeapon) this.boxGroup!.remove(this.boxWeapon);
-    this.boxWeapon = buildWeaponMesh(wid, false);
+    this.boxWeapon = wid === BOX_PART_ITEM ? buildPart(2, this.puffTex) : buildWeaponMesh(wid, false);
     this.boxWeapon.scale.setScalar(1.3);
     this.boxWeapon.position.set(0, 0.8, 0);
     this.boxWeapon.rotation.z = 0.2;
@@ -720,6 +764,42 @@ function buildPowerUp(kind: number, puff: THREE.Texture): THREE.Group {
   g.add(label);
   const light = new THREE.PointLight(c, 1.5, 5, 1.6);
   g.add(light);
+  return g;
+}
+
+/** Una pieza de la Thunder Gun: el núcleo (esfera), la bobina (anillos) o el gatillo (una caja con palanca), con su brillo. */
+function buildPart(kind: number, puff: THREE.Texture): THREE.Group {
+  const g = new THREE.Group();
+  const c = 0x9ad0ff;
+  const glow = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.4, roughness: 0.3, metalness: 0.4 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x6b6f75, roughness: 0.4, metalness: 0.8 });
+  if (kind === 0) {
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), glow));
+    const cage = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.015, 8, 20), metal);
+    cage.rotation.x = Math.PI / 2;
+    g.add(cage);
+  } else if (kind === 1) {
+    for (let i = 0; i < 4; i++) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.02, 8, 18), i % 2 ? glow : metal);
+      ring.position.y = -0.12 + i * 0.08;
+      ring.rotation.x = Math.PI / 2;
+      g.add(ring);
+    }
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.34, 8), metal));
+  } else {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.22), metal);
+    g.add(body);
+    const lever = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.03), glow);
+    lever.position.set(0, 0.1, -0.05);
+    lever.rotation.x = 0.4;
+    g.add(lever);
+  }
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, color: c, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+  halo.scale.setScalar(0.9);
+  g.add(halo);
+  const light = new THREE.PointLight(c, 1.0, 4, 1.6);
+  g.add(light);
+  g.userData.baseY = 0;
   return g;
 }
 

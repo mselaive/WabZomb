@@ -133,6 +133,18 @@ export class Effects {
     }
   }
 
+  /** El soplido de la Thunder Gun: una ristra de nubes que se abren hacia adelante. */
+  shockwave(from: THREE.Vector3, dir: THREE.Vector3, pap: boolean): void {
+    this.flash(from, 40);
+    const mat = pap ? this.sparkMat : this.dustMat;
+    for (let i = 0; i < 14; i++) {
+      const d = 0.6 + i * 0.6;
+      const spread = 0.08 + i * 0.09;
+      const at = from.clone().addScaledVector(dir, d).add(new THREE.Vector3((Math.random() - 0.5) * spread, (Math.random() - 0.5) * spread * 0.6, (Math.random() - 0.5) * spread));
+      this.puff(at, mat, 0.3 + i * 0.12, 0.35 + i * 0.03, 0.2, 2.5);
+    }
+  }
+
   /** El rayo verde de la Ray Gun (rojo mejorada): un trazador grueso que dura más. */
   rayBeam(from: THREE.Vector3, to: THREE.Vector3, pap: boolean): void {
     const geo = new THREE.BufferGeometry().setFromPoints([from, to]);

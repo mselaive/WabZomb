@@ -9,7 +9,7 @@ import {
   BTN_SCOPE,
   BTN_SHOOT,
   BTN_USE,
-  BTN_WALK,
+  BTN_SPRINT,
   FOV,
   FOV_SCOPED,
   HEAD_HEIGHT,
@@ -18,8 +18,11 @@ import {
   HIT_WORLD,
   INTERP_DELAY_MS,
   MS_PER_TICK,
+  EGG_PART_NAMES,
+  PERK_COLORS,
   PERK_QUICK,
   PERK_SPEED,
+  THUNDERGUN,
   POWERUP_NAMES,
   SP_ID,
   ZOMBIE_HALF_W,
@@ -403,6 +406,8 @@ export class Game {
     this.shadow.fireSale = msg.fx[2];
     this.shadow.songTicks = msg.fx[3];
     this.shadow.radios = msg.radios;
+    this.shadow.egg = msg.egg;
+    this.world.updateEgg(msg.egg);
     this.shadow.phase = msg.phase;
     this.shadow.round.number = this.latestRound.number;
     this.world.updateBoards(msg.boards);
@@ -581,8 +586,17 @@ export class Game {
         if (ev.byId !== this.myId) return;
         if (ev.what === "perk") {
           this.audio.perk();
+          this.viewModel.drink(PERK_COLORS[ev.which] ?? 0xffffff);
           this.ui.showBanner(weaponPerkName(ev.which), "gold", 1800);
+        } else if (ev.what === "weapon" && ev.which === THUNDERGUN) {
+          this.audio.powerUp();
+          this.ui.showBanner("Thunder Gun", "gold", 2500, "Un soplido que se lleva todo lo que tenga adelante");
         } else this.audio.buy();
+        return;
+      case "egg":
+        this.audio.powerUp();
+        if (ev.step === 3) this.ui.showBanner("Thunder Gun armada", "gold", 3000, `${this.ui.nameOf(ev.byId)} la armó en el banco del taller`);
+        else this.ui.showBanner(`Una pieza: ${EGG_PART_NAMES[ev.step] ?? ""}`, "gold", 2500, ev.step === 1 && (this.shadow.egg & 2) === 0 ? "Falta el núcleo (y la caja tiene el gatillo)" : "Con las tres, al banco del taller");
         return;
       case "box":
         if (ev.what === "open") this.audio.boxOpen();
@@ -639,7 +653,7 @@ export class Game {
         return;
       case "radio":
         this.audio.buy();
-        if (ev.all) this.ui.showBanner("Las tres radios", "gold", 3000, "Algo se escucha...");
+        if (ev.all) this.ui.showBanner("Las tres radios", "gold", 3000, "Algo se escucha... y algo se abrió en las calderas");
         else this.ui.showBanner("Una radio", "gold", 1500, `${(this.shadow.radios.toString(2).split("1").length - 1)} de 3`);
         return;
       case "gameover":
@@ -890,11 +904,12 @@ export class Game {
       const lookDy = this.input.pitch - this.prevPitch;
       this.prevYaw = this.input.yaw;
       this.prevPitch = this.input.pitch;
-      this.viewModel.update(dt, horiz, s.onGround, s.reloading, reloadSeconds, lookDx, lookDy);
+      const sprinting = this.input.sprintingNow(s);
+      this.viewModel.update(dt, horiz, s.onGround, s.reloading, reloadSeconds, lookDx, lookDy, sprinting);
       this.input.scoped = s.scoped;
-      this.applyFov(s.scoped ? FOV_SCOPED : FOV, dt);
+      this.applyFov(s.scoped ? FOV_SCOPED : sprinting ? FOV + 7 : FOV, dt);
       this.ui.setScope(s.scoped);
-      this.ui.setCrosshair(!s.scoped && wid >= 0 && !s.down, wid >= 0 ? spreadOf(s, weapon(wid), s.recoil) : 0);
+      this.ui.setCrosshair(!s.scoped && wid >= 0 && !sprinting && s.drinkTicks === 0, wid >= 0 ? spreadOf(s, weapon(wid), s.recoil) : 0);
 
       this.ui.setVitals(s.hp, s.maxHp, s.down);
       this.ui.setPoints(s.points);
@@ -959,7 +974,7 @@ export class Game {
     if (input.reload) btn |= BTN_RELOAD;
     if (input.jump) btn |= BTN_JUMP;
     if (input.crouch) btn |= BTN_CROUCH;
-    if (input.walk) btn |= BTN_WALK;
+    if (input.sprint) btn |= BTN_SPRINT;
     if (input.scope) btn |= BTN_SCOPE;
     if (input.use) btn |= BTN_USE;
     if (input.melee) btn |= BTN_MELEE;
@@ -1026,6 +1041,12 @@ export class Game {
         head = oy + d.y * tz - z.y > ZOMBIE_HEIGHT - HEAD_HEIGHT;
       }
       const to = new THREE.Vector3(ox + d.x * t, oy + d.y * t, oz + d.z * t);
+      if (shot.weapon === THUNDERGUN) {
+        // El soplido: una nube que se abre hacia adelante; los zombis vuelan cuando lo confirme el servidor.
+        this.effects.shockwave(from, new THREE.Vector3(d.x, d.y, d.z), pap);
+        this.punchPitch += 0.06;
+        continue;
+      }
       if (w.cls === "wonder") this.effects.rayBeam(from, to, pap);
       else this.effects.tracer(from, to);
       if (victim) {

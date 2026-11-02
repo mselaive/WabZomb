@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { FRAG, KNIFE, M1911, RAYGUN, weapon, weaponStats, type WeaponLook } from "@wabzomb/shared";
+import { FRAG, KNIFE, M1911, RAYGUN, THUNDERGUN, weapon, weaponStats, type WeaponLook } from "@wabzomb/shared";
 
 /**
  * Armas hechas de cajas y cilindros, armadas a partir de la descripción
@@ -85,8 +85,39 @@ function pistol(g: THREE.Group, look: WeaponLook, bodyMat: Mat, frameMat: Mat): 
       const a = (i / 6) * Math.PI * 2;
       tube(g, 0.004, 0.036, Math.cos(a) * 0.013, 0.022 + Math.sin(a) * 0.013, -0.04, STEEL, 6);
     }
+  } else {
+    // El cargador dentro de la empuñadura: al recargar sale por abajo y se ve.
+    const m = new THREE.Group();
+    m.name = "mag";
+    m.position.set(0, -0.045, 0.012);
+    box(m, 0.022, 0.1, 0.03, 0, 0, 0, STEEL, 0.22);
+    box(m, 0.03, 0.012, 0.038, 0, -0.056, 0.012, STEEL_LIGHT, 0.22);
+    g.add(m);
   }
   sights(g, 0.03 + tall / 2, -len + 0.045, 0.02);
+}
+
+/** La Thunder Gun: un cuerpo gordo con cuatro caños, un tanque arriba y anillos que brillan celeste. */
+function thunderGun(g: THREE.Group, look: WeaponLook, pap: boolean): void {
+  const body: Mat = { color: pap ? 0x4a3a6e : look.color, metal: 0.75, rough: 0.35 };
+  const dark: Mat = { color: look.wood, metal: 0.6, rough: 0.5 };
+  const glow: Mat = { color: look.glow ?? 0x9ad0ff, emissive: pap ? 0xff9a2a : look.glow ?? 0x9ad0ff, metal: 0.1, rough: 0.3 };
+  box(g, 0.07, 0.09, 0.3, 0, 0.03, -0.08, body);
+  for (const [x, y] of [[-0.025, 0.055], [0.025, 0.055], [-0.025, 0.005], [0.025, 0.005]] as const) tube(g, 0.016, 0.32, x, y, -0.36, dark, 10);
+  tube(g, 0.052, 0.04, 0, 0.03, -0.52, body, 14);
+  tube(g, 0.045, 0.012, 0, 0.03, -0.54, glow, 14);
+  // El tanque de arriba con sus abrazaderas, y los anillos.
+  tube(g, 0.03, 0.2, 0, 0.1, -0.06, dark, 12);
+  for (let i = 0; i < 3; i++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.056, 0.006, 8, 18), mat(glow));
+    ring.position.set(0, 0.03, -0.18 - i * 0.08);
+    g.add(ring);
+  }
+  // Empuñadura, gatillo y culata.
+  box(g, 0.03, 0.1, 0.045, 0, -0.05, 0.06, dark, 0.3);
+  box(g, 0.004, 0.024, 0.04, 0, -0.016, 0.0, STEEL);
+  box(g, 0.05, 0.07, 0.16, 0, 0.02, 0.17, dark);
+  box(g, 0.05, 0.09, 0.012, 0, 0.02, 0.25, { color: 0x15171a, metal: 0.5, rough: 0.6 });
 }
 
 /** Un fusil, subfusil, escopeta, ametralladora o francotirador, según `look`. */
@@ -245,6 +276,10 @@ export function buildWeaponMesh(id: number, firstPerson: boolean, pap = false): 
     // Las manos vacías (el arma se la llevó el Pack-a-Punch): un cuchillo de combate.
     knife(g);
     rightHand = [0, 0, 0.04];
+  } else if (id === THUNDERGUN) {
+    thunderGun(g, look, pap);
+    rightHand = [0, -0.07, 0.06];
+    leftHand = [0, -0.02, -0.26];
   } else if (w.cls === "wonder") {
     rayGun(g, look, pap);
     rightHand = [0, -0.07, 0.02];
@@ -323,6 +358,7 @@ export function muzzleOffset(id: number): THREE.Vector3 {
   if (id < 0 || id === KNIFE || id === FRAG) return new THREE.Vector3(0, 0, -0.3);
   const w = weapon(id);
   const look = w.look;
+  if (id === THUNDERGUN) return new THREE.Vector3(0, 0.03, -0.55);
   if (w.cls === "wonder") return new THREE.Vector3(0, 0.04, -0.33);
   if (w.cls === "pistol") return new THREE.Vector3(0, 0.032, -look.body + 0.03 - look.barrel);
   return new THREE.Vector3(0, 0.05, -look.body / 2 + 0.05 - look.body / 2 - look.barrel);
@@ -379,6 +415,12 @@ export class ViewModel {
   private landDip = 0;
   private hidden = false;
   private time = 0;
+  /** Corriendo: el arma baja y se cruza; se mezcla de a poco. */
+  private sprintK = 0;
+  /** Tomando una bebida: la botella sube, se inclina y se va. */
+  private bottle: THREE.Group | null = null;
+  private drinkT = 0;
+  private readonly drinkTotal = 2.4;
 
   constructor(camera: THREE.Camera) {
     camera.add(this.root);
@@ -394,6 +436,7 @@ export class ViewModel {
     if (id === this.current && pap === this.currentPap) return;
     if (this.mesh) this.root.remove(this.mesh);
     this.mesh = buildWeaponMesh(id, true, pap);
+    if (id === THUNDERGUN) this.mesh.scale.setScalar(0.8);
     this.root.add(this.mesh);
     this.current = id;
     this.currentPap = pap;
@@ -470,18 +513,45 @@ export class ViewModel {
     this.landDip = Math.min(1, this.landDip + strength);
   }
 
+  /** Tomar una bebida del color de la máquina: la botella tapa el arma un par de segundos. */
+  drink(color: number): void {
+    if (this.bottle) this.root.remove(this.bottle);
+    const b = new THREE.Group();
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.034, 0.17, 12), mat({ color, metal: 0.1, rough: 0.25 }));
+    glass.position.y = 0.085;
+    b.add(glass);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.024, 0.06, 10), mat({ color, metal: 0.1, rough: 0.25 }));
+    neck.position.y = 0.195;
+    b.add(neck);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.02, 10), mat(STEEL_LIGHT));
+    cap.position.y = 0.235;
+    b.add(cap);
+    const label = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 12), mat({ color: 0xf2eadc, rough: 0.8 }));
+    label.position.y = 0.09;
+    b.add(label);
+    // La mano que la sostiene.
+    box(b, 0.07, 0.07, 0.07, 0.03, 0.06, 0.0, GLOVE, 0.1);
+    box(b, 0.075, 0.08, 0.24, 0.05, -0.08, 0.16, SLEEVE, 0.5);
+    b.visible = false;
+    this.root.add(b);
+    this.bottle = b;
+    this.drinkT = this.drinkTotal;
+    this.inspectT = 0;
+  }
+
   ejectPoint(camera: THREE.Camera, out: THREE.Vector3): THREE.Vector3 {
     out.set(0.03, 0.04, -0.12).add(this.root.position);
     camera.updateMatrixWorld();
     return camera.localToWorld(out);
   }
 
-  update(dt: number, speed: number, onGround: boolean, reloading: boolean, reloadSeconds: number, lookDx = 0, lookDy = 0): void {
+  update(dt: number, speed: number, onGround: boolean, reloading: boolean, reloadSeconds: number, lookDx = 0, lookDy = 0, sprinting = false): void {
     if (this.hidden || !this.mesh) return;
     this.time += dt;
 
-    this.bob += dt * (onGround ? Math.min(speed, 6) * 2.3 : 0.8);
-    const amp = onGround ? Math.min(speed / 5, 1) * 0.014 : 0.004;
+    this.sprintK += ((sprinting ? 1 : 0) - this.sprintK) * Math.min(1, dt * 9);
+    this.bob += dt * (onGround ? Math.min(speed, 7) * 2.3 : 0.8);
+    const amp = onGround ? Math.min(speed / 5, 1.3) * 0.014 : 0.004;
     const bx = Math.sin(this.bob) * amp;
     const by = -Math.abs(Math.cos(this.bob)) * amp * 0.8;
     const idleX = Math.sin(this.time * 1.3) * 0.0025;
@@ -514,33 +584,42 @@ export class ViewModel {
     let lhZ = 0;
     let rhY = 0;
     let rhZ = 0;
+    let slideBack = 0;
     if (reloading) {
       const inOut = Math.sin(Math.PI * Math.min(1, rt));
-      tiltZ = 0.4 * inOut;
-      tiltX = 0.18 * inOut;
-      dropY = -0.06 * inOut;
+      // El arma se ladea bien hacia el medio de la pantalla, para que se vea el cargador salir.
+      tiltZ = 0.6 * inOut;
+      tiltX = 0.28 * inOut;
+      dropY = 0.03 * inOut;
       if (this.mag) {
+        // Hasta dónde baja el cargador: lo justo para que se vea salir sin irse de cuadro.
+        const drop = this.current >= 0 && weapon(this.current).cls === "pistol" ? 0.16 : 0.26;
         let magOff = 0;
         let visible = true;
-        if (rt < 0.3) magOff = -0.3 * smooth((rt - 0.08) / 0.22);
+        if (rt < 0.3) magOff = -drop * smooth((rt - 0.06) / 0.22);
         else if (rt < 0.55) visible = false;
-        else if (rt < 0.85) magOff = -0.3 * (1 - smooth((rt - 0.55) / 0.3));
+        else if (rt < 0.85) magOff = -drop * (1 - smooth((rt - 0.55) / 0.3));
         this.mag.visible = visible;
         this.mag.position.set(this.magHome.x, this.magHome.y + magOff, this.magHome.z + (visible ? magOff * 0.3 : 0));
-        lhY = visible ? magOff : -0.3;
+        lhY = visible ? magOff : -drop;
         lhZ = (visible ? magOff * 0.3 : -0.09) + 0.04 * inOut;
         lhX = -0.03 * inOut;
       } else {
         lhY = -0.07 * Math.abs(Math.sin(rt * Math.PI * 4)) - 0.03 * inOut;
         lhZ = 0.1 * inOut;
       }
-      if (rt > 0.85) tiltX += -0.12 * Math.sin((Math.PI * (rt - 0.85)) / 0.15);
+      // El golpe final: la palmada al cargador y, en las pistolas, la corredera que vuelve.
+      if (rt > 0.85) {
+        const k = Math.sin((Math.PI * (rt - 0.85)) / 0.15);
+        tiltX += -0.16 * k;
+        if (this.slide) slideBack = rt < 0.93 ? 1 : 0;
+      }
     } else if (this.mag) {
       this.mag.visible = true;
       this.mag.position.copy(this.magHome);
     }
 
-    if (this.slide) this.slide.position.set(this.slideHome.x, this.slideHome.y, this.slideHome.z + 0.035 * this.slideT);
+    if (this.slide) this.slide.position.set(this.slideHome.x, this.slideHome.y, this.slideHome.z + 0.035 * Math.max(this.slideT, slideBack));
     let cycleTilt = 0;
     if (this.cycleT > 0) {
       this.cycleT = Math.max(0, this.cycleT - dt);
@@ -587,12 +666,35 @@ export class ViewModel {
       insZ = -0.07 * s;
     }
 
+    // La bebida: el arma baja del todo y la botella sube, se inclina y se va.
+    let drinkDown = 0;
+    if (this.drinkT > 0) {
+      this.drinkT = Math.max(0, this.drinkT - dt);
+      const t = 1 - this.drinkT / this.drinkTotal;
+      drinkDown = smooth(Math.min(1, t / 0.2)) * (1 - smooth(Math.max(0, (t - 0.8) / 0.2)));
+      if (this.bottle) {
+        this.bottle.visible = drinkDown > 0.05;
+        const up = drinkDown;
+        const tilt = Math.sin(Math.PI * Math.max(0, Math.min(1, (t - 0.25) / 0.5)));
+        this.bottle.position.set(-0.08 + 0.02 * tilt, -0.3 + 0.2 * up + 0.08 * tilt, -0.02 - 0.06 * tilt);
+        this.bottle.rotation.set(-1.1 * tilt, 0.3, 0.25 + 0.2 * tilt);
+      }
+    } else if (this.bottle) {
+      this.root.remove(this.bottle);
+      this.bottle = null;
+    }
+    const sp = this.sprintK;
+
     this.mesh.position.set(
-      bx + idleX + this.swayX + this.kickSide * kk + mX + insX,
-      by + idleY + this.swayY * 0.6 - drawK * 0.35 - this.landDip * 0.05 + dropY + insY,
-      kk * 0.05 + mZ + insZ,
+      bx + idleX + this.swayX + this.kickSide * kk + mX + insX - sp * 0.03,
+      by + idleY + this.swayY * 0.6 - drawK * 0.35 - this.landDip * 0.05 + dropY + insY - sp * 0.1 - drinkDown * 0.4,
+      kk * 0.05 + mZ + insZ + sp * 0.04,
     );
-    this.mesh.rotation.set(-kk * 0.14 + drawK * 1.1 + tiltX + mRot + cycleTilt + this.landDip * 0.08 + insRX, this.swayX * 0.8 + drawK * 0.25 + insRY, this.kickSide * kk * 2 + tiltZ + insRZ);
+    this.mesh.rotation.set(
+      -kk * 0.14 + drawK * 1.1 + tiltX + mRot + cycleTilt + this.landDip * 0.08 + insRX + sp * 0.32 + drinkDown * 0.9,
+      this.swayX * 0.8 + drawK * 0.25 + insRY - sp * 0.7,
+      this.kickSide * kk * 2 + tiltZ + insRZ + sp * 0.12,
+    );
 
     if (this.flashLeft > 0) {
       this.flashLeft -= dt;

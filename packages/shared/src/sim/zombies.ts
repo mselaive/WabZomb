@@ -9,6 +9,7 @@ import {
   ZOMBIE_MAX_ALIVE,
   ZOMBIE_RISE_TICKS,
   ZOMBIE_SPEEDS,
+  ZOMBIE_WAIT_RANGE,
   ZOMBIE_WINDUP_TICKS,
   zombieHp,
   zombieSpawnInterval,
@@ -284,7 +285,13 @@ function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly
       const dxT = t.x - z.x;
       const dzT = t.z - z.z;
       const dT = Math.hypot(dxT, dzT);
-      if (dT <= ZOMBIE_ATTACK_RANGE && Math.abs(t.y - z.y) < 1.4 && z.attackCd === 0) {
+      // Un caído que es lo único que queda: lo rodean a distancia y esperan, sin pegarle.
+      if (t.down && dT <= ZOMBIE_WAIT_RANGE) {
+        faceToward(z, t.x, t.z, 0.3);
+        moveBody(z, 0, 0, 0, false, ZOMBIE_HEIGHT, boxes);
+        return true;
+      }
+      if (!t.down && dT <= ZOMBIE_ATTACK_RANGE && Math.abs(t.y - z.y) < 1.4 && z.attackCd === 0) {
         z.state = Z_ATTACK;
         z.stateTicks = ZOMBIE_WINDUP_TICKS;
         z.vx = 0;

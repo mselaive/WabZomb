@@ -12,7 +12,7 @@ import {
   zombieCount,
 } from "../constants.js";
 import { mulberry32 } from "../math.js";
-import type { GameMap } from "../map/types.js";
+import type { Box, GameMap } from "../map/types.js";
 import { M1911, weaponStats } from "../weapons.js";
 import { resetTrail, revivePlayer } from "./combat.js";
 import type { GameState, PlayerState, SimEvent } from "./types.js";
@@ -66,6 +66,8 @@ export function placeAt(p: PlayerState, s: { x: number; y: number; z: number; ya
   p.scoped = false;
   p.tagged = 0;
   p.fallImpact = 0;
+  p.invulnTicks = 0;
+  p.drinkTicks = 0;
   p.diedAtTick = -1;
   p.useTicks = 0;
   p.boardsPaid = 0;
@@ -95,7 +97,10 @@ export function startMatch(state: GameState, seed: number, map: GameMap, events:
   state.fireSale = 0;
   state.radios = 0;
   state.songTicks = 0;
+  state.egg = 0;
   state.reachedRound = 0;
+  // La caja arranca en cualquiera de sus lugares: en cada partida hay que salir a buscarla.
+  state.box.spot = Math.floor((state.rng ?? Math.random)() * Math.max(1, map.boxSpots.length));
   state.round = { number: 1, phase: "intermission", ticksLeft: ROUND_INTERMISSION_TICKS, total: 0, spawned: 0, killed: 0, nextSpawnAt: 0, powerUps: 0 };
   const members = state.players.filter((p) => p.connected).sort((a, b) => a.id - b.id);
   members.forEach((p, i) => {
@@ -178,7 +183,7 @@ export function stepRound(state: GameState, map: GameMap, events: SimEvent[]): v
 }
 
 /** Vida que vuelve, caídos que se desangran o se levantan solos, revividas que se cortan. */
-export function stepPlayerStatus(state: GameState, events: SimEvent[]): void {
+export function stepPlayerStatus(state: GameState, events: SimEvent[], boxes: readonly Box[] = []): void {
   for (const p of state.players) {
     if (!p.connected || !p.alive) continue;
     if (p.down) {
@@ -186,7 +191,7 @@ export function stepPlayerStatus(state: GameState, events: SimEvent[]): void {
       p.reviveBy = -1;
       if (--p.bleedTicks <= 0) {
         if (p.selfRevive) {
-          revivePlayer(state, p, p, REVIVE_HP, events);
+          revivePlayer(state, p, p, REVIVE_HP, events, boxes);
         } else {
           p.alive = false;
           p.down = false;

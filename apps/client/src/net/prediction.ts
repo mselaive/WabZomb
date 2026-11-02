@@ -125,6 +125,8 @@ export class Predictor {
       s.recoil = server.own.recoil;
       s.meleeCd = server.own.meleeCd;
       s.quickRevives = server.own.quickRevives;
+      s.invulnTicks = server.own.invulnTicks;
+      s.drinkTicks = server.own.drinkTicks;
     }
   }
 

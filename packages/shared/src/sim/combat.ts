@@ -26,6 +26,9 @@ import {
   POWERUP_CHANCE,
   POWERUP_MAX_PER_ROUND,
   REGEN_DELAY_TICKS,
+  REVIVE_INVULN_TICKS,
+  REVIVE_PUSH_RANGE,
+  THUNDER_COS,
   SOLO_REVIVE_TICKS,
   TAG_TICKS,
   TRAIL_LENGTH,
@@ -39,7 +42,7 @@ import { hashUnit, lerp, viewDir, type Vec3 } from "../math.js";
 import { rayAabb, raycastBoxes, segmentClear, type RayHit } from "../map/raycast.js";
 import type { Box } from "../map/types.js";
 import { KNIFE, SLOT_COUNT, weapon, weaponStats, type WeaponDef } from "../weapons.js";
-import { eyeHeightOf, hasPerk, heightOf } from "./movement.js";
+import { eyeHeightOf, hasPerk, heightOf, isSprinting, overlapsAny } from "./movement.js";
 import { dropPowerUp } from "./powerups.js";
 import { HIT_BODY, HIT_HEAD, HIT_NONE, HIT_WORLD, type Body, type GameState, type PlayerInput, type PlayerState, type SimEvent, type ZombieState } from "./types.js";
 
@@ -137,7 +140,9 @@ export function stepWeaponState(p: PlayerState, input: PlayerInput, canAct: bool
 
   let fired = -1;
   const trigger = input.shoot && (stats.auto || !p.shootHeld);
-  if (canAct && trigger && ready && ammo > 0) {
+  // Corriendo o tomando una bebida no se dispara.
+  const busy = isSprinting(p, input) || p.drinkTicks > 0;
+  if (canAct && trigger && ready && ammo > 0 && !busy) {
     p.ammo[p.active] = ammo - 1;
     p.fireCd = stats.fireTicks;
     p.recoil++;
@@ -316,6 +321,21 @@ export function resolveShot(state: GameState, shooter: PlayerState, wid: number,
     const ez = oz + d.z * best;
     hits.push(Math.round(ex * 100) / 100, Math.round(ey * 100) / 100, Math.round(ez * 100) / 100, kind);
 
+    if (stats.blast > 0) {
+      // El soplido: todos los que estén en el cono y a la vista, de una.
+      for (const zb of state.zombies.slice()) {
+        const dx = zb.x - ox;
+        const dy = zb.y + ZOMBIE_HEIGHT * 0.5 - oy;
+        const dz = zb.z - oz;
+        const dist = Math.hypot(dx, dy, dz);
+        if (dist > stats.blast || dist < 0.01) continue;
+        const cos = (dx * d.x + dy * d.y + dz * d.z) / dist;
+        if (cos < THUNDER_COS) continue;
+        if (!segmentClear(ox, oy, oz, zb.x, zb.y + ZOMBIE_HEIGHT * 0.5, zb.z, boxes)) continue;
+        damageZombie(state, zb, shooter, zb.hp, ZONE_BODY, wid, zb.x, zb.y + 1, zb.z, events);
+      }
+      continue;
+    }
     if (stats.explosive > 0 && kind !== HIT_NONE) {
       // Estalla ahí: a todos los que estén cerca (el que disparó también, un poco).
       explodeAt(state, shooter, ex, ey, ez, stats.explosive, stats.damage * doubleTap, wid, boxes, events, target);
@@ -422,9 +442,9 @@ export function killZombie(state: GameState, z: ZombieState, by: PlayerState | n
   events.push({ t: "zkill", zombieId: z.id, byId: by?.id ?? -1, weapon: wid, headshot, x: Math.round(z.x * 100) / 100, y: Math.round(z.y * 100) / 100, z: Math.round(z.z * 100) / 100 });
 }
 
-/** Un zombi (o una explosión) le pega a alguien. */
+/** Un zombi (o una explosión) le pega a alguien. Recién levantado, nada lo toca. */
 export function damagePlayer(state: GameState, p: PlayerState, amount: number, zombieId: number, events: SimEvent[]): void {
-  if (!p.alive || p.down) return;
+  if (!p.alive || p.down || p.invulnTicks > 0) return;
   const applied = Math.min(amount, p.hp);
   p.hp -= applied;
   p.regenAt = state.tick + REGEN_DELAY_TICKS;
@@ -448,6 +468,7 @@ export function downPlayer(state: GameState, p: PlayerState, events: SimEvent[])
   p.bleedTicks = p.selfRevive ? SOLO_REVIVE_TICKS : DOWN_BLEED_TICKS;
   p.perks = 0;
   p.maxHp = MAX_HP;
+  p.drinkTicks = 0;
   // Sin Mule Kick, la tercera arma se pierde.
   if ((p.slots[2] ?? -1) >= 0) {
     p.slots[2] = -1;
@@ -456,10 +477,23 @@ export function downPlayer(state: GameState, p: PlayerState, events: SimEvent[])
     p.pap[2] = 0;
     if (p.active === 2) switchTo(p, firstUsableSlot(p));
   }
+  // En el piso se defiende con la pistola, si tiene.
+  for (let s = 0; s < SLOT_COUNT; s++) {
+    const wid = p.slots[s] ?? -1;
+    if (wid >= 0 && weapon(wid).cls === "pistol" && s !== p.active) {
+      switchTo(p, s);
+      break;
+    }
+  }
   events.push({ t: "down", id: p.id });
 }
 
-export function revivePlayer(state: GameState, p: PlayerState, by: PlayerState | null, hp: number, events: SimEvent[]): void {
+/**
+ * Se levanta: con algo de vida, un rato sin que lo toquen, y los zombis que
+ * tenía encima salen empujados y tardan en volver a pegar. Así no es morir
+ * dos veces seguidas.
+ */
+export function revivePlayer(state: GameState, p: PlayerState, by: PlayerState | null, hp: number, events: SimEvent[], boxes: readonly Box[] = []): void {
   p.down = false;
   p.selfRevive = false;
   p.hp = Math.min(p.maxHp, hp);
@@ -467,6 +501,29 @@ export function revivePlayer(state: GameState, p: PlayerState, by: PlayerState |
   p.bleedTicks = 0;
   p.reviveTicks = 0;
   p.reviveBy = -1;
+  p.invulnTicks = REVIVE_INVULN_TICKS;
+  for (const z of state.zombies) {
+    const dx = z.x - p.x;
+    const dz = z.z - p.z;
+    const d = Math.hypot(dx, dz);
+    if (d > REVIVE_PUSH_RANGE || z.state < 4) continue;
+    z.attackCd = Math.max(z.attackCd, REVIVE_INVULN_TICKS);
+    z.path = [];
+    z.repathAt = 0;
+    const nx = d > 0.01 ? dx / d : 1;
+    const nz = d > 0.01 ? dz / d : 0;
+    for (let push = 2.5; push > 0; push -= 0.5) {
+      const tx = p.x + nx * (d + push);
+      const tz = p.z + nz * (d + push);
+      if (!overlapsAny(tx, z.y, tz, ZOMBIE_HEIGHT, boxes)) {
+        z.x = tx;
+        z.z = tz;
+        z.vx = nx * 4;
+        z.vz = nz * 4;
+        break;
+      }
+    }
+  }
   if (by && by !== p) by.revives++;
   events.push({ t: "revive", id: p.id, byId: by?.id ?? p.id });
 }

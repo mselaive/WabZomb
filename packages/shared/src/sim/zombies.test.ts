@@ -56,8 +56,9 @@ describe("rondas y zombis", () => {
       if ((p.ammo[p.active] ?? 0) === 0) h.tick({ 1: { reload: true } });
       else h.shootNearest();
       for (const e of h.events.splice(0)) if (e.t === "zkill") kills.push(e.zombieId);
-      // Munición infinita para la prueba: lo que importa es la ronda.
+      // Munición infinita y vida entera para la prueba: lo que importa es la ronda.
       p.reserve[p.active] = 500;
+      p.hp = p.maxHp;
     }
     expect(p.down).toBe(false);
     expect(kills.length).toBe(zombieCount(1, 1));
@@ -75,7 +76,9 @@ describe("rondas y zombis", () => {
     p.x = -18;
     p.z = 5;
     skipIntermission(h);
-    h.run(25 * TICK_RATE);
+    // Más zombis que los de la ronda 1, para que seguro salga alguno del piso.
+    h.state.round.total = 40;
+    h.run(45 * TICK_RATE);
     const inside = h.state.zombies.filter((z) => z.barrier < 0);
     expect(inside.length).toBeGreaterThan(0);
     for (const z of h.state.zombies) {

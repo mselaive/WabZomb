@@ -14,7 +14,7 @@ const LEFT = new Set(["KeyA", "ArrowLeft"]);
 const RIGHT = new Set(["KeyD", "ArrowRight"]);
 const JUMP = new Set(["Space"]);
 const CROUCH = new Set(["ControlLeft", "ControlRight", "KeyC"]);
-const WALK = new Set(["ShiftLeft", "ShiftRight"]);
+const SPRINT = new Set(["ShiftLeft", "ShiftRight"]);
 const MELEE = new Set(["KeyV"]);
 
 export type UiIntent = "scoreboardOn" | "scoreboardOff" | "chat" | "lastWeapon" | "spectateNext" | "pause" | "exitFullscreen" | "inspect";
@@ -237,6 +237,11 @@ export class InputController {
     this.pendingAction = action;
   }
 
+  /** ¿Está corriendo ahora mismo (Shift y adelante, de pie, sin la mira)? Para la pose del arma. */
+  sprintingNow(s: { crouch: number; scoped: boolean; down: boolean; alive: boolean }): boolean {
+    return this.enabled && !this.uiBusy && this.any(SPRINT) && this.axis(BACK, FWD) > 0 && s.crouch === 0 && !s.scoped && !s.down && s.alive;
+  }
+
   takeShotTrigger(): boolean {
     const t = this.shotTrigger;
     this.shotTrigger = false;
@@ -269,7 +274,7 @@ export class InputController {
       fwd: this.axis(BACK, FWD),
       side: this.axis(LEFT, RIGHT),
       up: (this.any(JUMP) ? 1 : 0) - (this.any(CROUCH) ? 1 : 0),
-      fast: this.any(WALK),
+      fast: this.any(SPRINT),
     };
   }
 
@@ -286,7 +291,7 @@ export class InputController {
       reload: this.reloadQueued,
       jump: !busy && (this.jumpQueued || this.any(JUMP)),
       crouch: !busy && this.any(CROUCH),
-      walk: this.any(WALK),
+      sprint: !busy && this.any(SPRINT),
       scope: !busy && this.scoping,
       use: !busy && this.keys.has("KeyE"),
       melee: !busy && (this.meleeQueued || this.any(MELEE)),

@@ -92,7 +92,7 @@ export interface MatchStartMsg {
  * --- sólo el propio:
  * 19 ammo0, 20 reserve0, 21 ammo1, 22 reserve1, 23 ammo2, 24 reserve2,
  * 25 pap (bits), 26 fireCd, 27 reloadCd, 28 drawCd, 29 recoil, 30 vy (cm/s),
- * 31 granadas, 32 tagged, 33 meleeCd, 34 quickRevives
+ * 31 granadas, 32 tagged, 33 meleeCd, 34 quickRevives, 35 invulnTicks, 36 drinkTicks
  */
 export type SnapPlayer = number[];
 
@@ -173,6 +173,8 @@ export interface SnapshotMsg {
   /** Ticks que quedan de Insta-Kill, Double Points, Fire Sale y la canción. */
   fx: [number, number, number, number];
   radios: number;
+  /** El easter egg (bits EGG_*). */
+  egg: number;
   st: SnapStanding[];
   /** A qué ronda llegaron (cuando terminó). */
   reached: number;

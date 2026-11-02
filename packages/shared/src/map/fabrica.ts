@@ -255,6 +255,9 @@ function build(): GameMap {
   boxes.push(barrel(14.2, 16.1));
   boxes.push(box(16, 0, -1, 19, 0.9, -0.4, TEX_SANDBAG));
   boxes.push(crate(10, 16.5, 1.2));
+  // Dos cajones apilados contra el contenedor chico: por ahí se sube al techo (la bobina está arriba).
+  boxes.push(crate(14.2, 3, 1.2));
+  boxes.push(crate(14.2, 3, 1.2, 1.2, TEX_WOOD));
   boxes.push(pillar(19, 4, 3.2, 0.3));
 
   // ---- Calderas: dos calderas grandes, tubos y la tarima de la llave de la luz.
@@ -264,6 +267,8 @@ function build(): GameMap {
   boxes.push(box(-21, 0, -23.8, -15, 0.25, -22.4, TEX_METAL));
   boxes.push(barrel(-27, -11));
   boxes.push(crate(-10, -11, 1.1));
+  // El armario con llave de la primera pieza: lo abren las tres radios.
+  doors.push({ id: 6, name: "Armario", price: 0, box: box(-10.6, 0, -13.4, -9.4, 2.2, -12.2, TEX_METAL), zones: [3, 3], locked: true });
 
   // ---- Taller: mesas de trabajo, un elevador de autos y un auto a medio desarmar.
   boxes.push(box(8.5, 0, -23.5, 11.4, 0.9, -22.5, TEX_METAL));
@@ -343,6 +348,11 @@ function build(): GameMap {
     perks,
     pap: { x: 0, z: -21.5, yaw: Math.PI, zone: 5 },
     power: { x: -18, z: -22.9, yaw: Math.PI, zone: 3 },
+    eggParts: [
+      { x: -10, y: 1.1, z: -12.8 },
+      { x: 11.75, y: 2.75, z: 3 },
+    ],
+    bench: { x: 10, z: -21.9, yaw: Math.PI, zone: 4 },
     radios: [
       { x: -27, y: 2.25, z: 14.85, yaw: Math.PI / 2 },
       { x: 24, y: 2.6, z: -4.8, yaw: 0 },

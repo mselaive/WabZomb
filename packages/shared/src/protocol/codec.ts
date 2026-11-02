@@ -133,6 +133,8 @@ export function packPlayer(p: PlayerState, own: boolean): SnapPlayer {
       p.tagged,
       p.meleeCd,
       p.quickRevives,
+      p.invulnTicks,
+      p.drinkTicks,
     );
   }
   return out;
@@ -182,6 +184,8 @@ export interface UnpackedPlayer {
     tagged: number;
     meleeCd: number;
     quickRevives: number;
+    invulnTicks: number;
+    drinkTicks: number;
   } | null;
 }
 
@@ -211,6 +215,8 @@ export function unpackPlayer(t: SnapPlayer): UnpackedPlayer {
           tagged: t[SP_OWN + 13] ?? 0,
           meleeCd: t[SP_OWN + 14] ?? 0,
           quickRevives: t[SP_OWN + 15] ?? 0,
+          invulnTicks: t[SP_OWN + 16] ?? 0,
+          drinkTicks: t[SP_OWN + 17] ?? 0,
         }
       : null;
   return {

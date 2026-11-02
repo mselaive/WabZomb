@@ -29,7 +29,7 @@ Los puertos son distintos de los de WabCS (5173 y 8787) para poder tener los dos
 
 | Tecla | Acción |
 |---|---|
-| `WASD` | moverse · `Shift` caminar · `Ctrl` / `C` agacharse · `Espacio` saltar |
+| `WASD` | moverse · `Shift` correr (hacia adelante; corriendo no se dispara) · `Ctrl` / `C` agacharse · `Espacio` saltar |
 | Mouse | mirar (el primer click captura el puntero; `Esc` abre la pausa) |
 | Click izquierdo | disparar · click derecho: la mira (los que tienen) |
 | `R` | recargar · `1` `2` `3` cambiar de arma · `Q` la última arma · `F` mirar el arma |
@@ -48,9 +48,11 @@ Los puertos son distintos de los de WabCS (5173 y 8787) para poder tener los dos
 - Todo se paga con **puntos**: 10 por tiro que pega, 60 por baja, 100 en la cabeza, 130 con el
   cuchillo, 50 con una granada. Se arranca con 500.
 - Dos manotazos te **tiran** (cinco con Juggernog). La vida vuelve sola a los 3,5 s sin que te
-  peguen. Caído, un compañero te levanta sosteniendo `E` (más rápido con Quick Revive); si nadie
-  llega en 45 s, te morís hasta la próxima ronda. Jugando solo, Quick Revive te levanta a vos
-  (tres veces por partida). Si caen todos, se terminó: queda la ronda a la que llegaron.
+  peguen. Caído seguís disparando con la pistola; un compañero te levanta sosteniendo `E` (más
+  rápido con Quick Revive); si nadie llega en 45 s, te morís hasta la próxima ronda. Jugando solo,
+  Quick Revive te levanta a vos (tres veces por partida): mientras estás en el piso los zombis se
+  quedan a distancia, y al levantarte salen empujados y tenés 2,5 s sin que te toquen. Si caen
+  todos, se terminó: queda la ronda a la que llegaron.
 
 ### El mapa: La Fábrica
 
@@ -69,9 +71,10 @@ Una fábrica abandonada de noche, seis zonas y dos caminos para dar la vuelta en
 
 - **Armas de pared**: la tiza en la pared. La primera vez te la da cargada; si ya la tenés, te vende
   la munición a mitad de precio (4500 si está mejorada).
-- **Caja misteriosa** (950): un arma al azar de las 20 que hay, incluida la Ray Gun (rara). La
-  deja a la vista 10 s para agarrarla con `E`. A partir de la quinta vuelta puede salir el **osito**:
-  te devuelve la plata y la caja se muda a otro de sus cuatro lugares. Con **Fire Sale** sale 10.
+- **Caja misteriosa** (950): arranca en cualquiera de sus cuatro lugares (depósito, patio,
+  calderas o taller: siempre antes del laboratorio) y da un arma al azar de las 20 que hay,
+  incluida la Ray Gun (rara). La deja a la vista 10 s para agarrarla con `E`. A partir de la quinta
+  vuelta puede salir el **osito**: te devuelve la plata y la caja se muda. Con **Fire Sale** sale 10.
 - **La luz**: la palanca de las calderas. Sin luz no andan las bebidas (salvo Quick Revive) ni el
   Pack-a-Punch.
 - **Bebidas** (hasta cuatro; caerse las saca todas):
@@ -103,6 +106,7 @@ Caen de vez en cuando donde muere un zombi (hasta cuatro por ronda) y duran 30 s
 | RPK · HK21 | caja | 55 · 60 | 100 · 125 | R115 Resonator · H115 Oscillator |
 | L96A1 · Dragunov | caja | 400 · 250 | 5 · 10 | L115 Isolator · D115 Disassembler |
 | Ray Gun | caja (rara) | 1000 + explosión | 20 | Porter's X2 Ray Gun |
+| Thunder Gun | se arma (easter egg) | mata a todos en 9 m adelante | 2 | Zeus Cannon (13 m) |
 
 En la cabeza pega 3 veces (3,5 los fusiles, 5 el L96). Las escopetas pierden mucho con la
 distancia; los fusiles casi nada.
@@ -110,7 +114,11 @@ distancia; los fusiles casi nada.
 ### El easter egg
 
 Hay tres radios viejas escondidas en el mapa. Prenderlas las tres con `E` hace sonar una canción
-para todos. Dónde están, no lo dice el README.
+para todos... y abre algo que estaba con llave. De ahí en adelante hay tres piezas para juntar (una
+de ellas la da la caja misteriosa, pero sólo cuando ya tenés las otras dos) y un banco de trabajo
+en el que se arma la **Thunder Gun**: un soplido que se lleva a todos los zombis que tenga
+adelante, 2 tiros por cargador. Mejorada es la **Zeus Cannon**. Dónde está cada cosa, no lo dice
+el README.
 
 ## Cómo está hecho
 

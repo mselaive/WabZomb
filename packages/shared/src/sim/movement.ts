@@ -17,7 +17,7 @@ import {
   STEP_HEIGHT,
   TAG_FACTOR,
   TAG_TICKS,
-  WALK_FACTOR,
+  SPRINT_FACTOR,
 } from "../constants.js";
 import { clamp, forwardXZ, lerp, rightXZ } from "../math.js";
 import type { Box, GameMap } from "../map/types.js";
@@ -41,12 +41,17 @@ export function hasPerk(p: { perks: number }, perk: number): boolean {
   return (p.perks & (1 << perk)) !== 0;
 }
 
+/** Corriendo: Shift y hacia adelante, de pie, sin la mira puesta. Corriendo no se dispara. */
+export function isSprinting(p: PlayerState, input: PlayerInput): boolean {
+  return input.sprint && input.fwd > 0 && p.crouch === 0 && !p.scoped && !p.down && p.alive;
+}
+
 /** Velocidad máxima en el piso con lo que lleva en la mano y la postura. */
 export function maxSpeedOf(p: PlayerState, input: PlayerInput): number {
   let v = weapon(p.slots[p.active] ?? 1).speed;
   if (hasPerk(p, PERK_STAMIN)) v *= STAMIN_FACTOR;
   if (p.crouch > 0) v *= CROUCH_FACTOR;
-  else if (input.walk) v *= WALK_FACTOR;
+  else if (isSprinting(p, input)) v *= SPRINT_FACTOR;
   if (p.scoped) v *= 0.6;
   if (p.tagged > 0) v *= 1 - (1 - TAG_FACTOR) * (p.tagged / TAG_TICKS);
   return v;
@@ -220,6 +225,8 @@ export function stepPlayerMovement(p: PlayerState, input: PlayerInput, boxes: re
   p.pitch = clamp(input.pitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
   if (!p.alive) return;
   if (p.tagged > 0) p.tagged--;
+  if (p.invulnTicks > 0) p.invulnTicks--;
+  if (p.drinkTicks > 0) p.drinkTicks--;
   p.fallImpact = 0;
 
   // Agacharse: la altura baja de a poco. Para levantarse hace falta lugar. Caído, siempre agachado.

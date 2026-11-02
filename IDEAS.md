@@ -16,7 +16,10 @@ Lo que hay, lo que quedó en la lista y por qué. Primera versión: 2 de noviemb
 | Bebidas | Seis, con la luz como requisito (menos Quick Revive), tope de cuatro, se pierden al caer | Tests |
 | Caídos | Revivir sosteniendo E, desangrado, Quick Revive solo, fin de partida | Tests |
 | Power-ups | Max Ammo, Insta-Kill, Double Points, Nuke, Carpenter, Fire Sale | Revisado; sin test propio |
-| Easter egg | Tres radios escondidas; las tres prendidas hacen sonar una canción generada | Revisado; sin test propio |
+| Easter egg | Tres radios (canción y abren el armario), tres piezas (armario, arriba de un contenedor, la caja), banco de trabajo, Thunder Gun con soplido en cono | 4 tests |
+| Correr | Shift corre hacia adelante (1,32x) con el arma baja; corriendo no se dispara | 1 test |
+| Bebidas | Animación de la botella al tomar; 2,5 s sin disparar | 1 test + captura |
+| Caído con Quick Revive | Se dispara con la pistola; los zombis esperan a distancia; al levantarse salen empujados y hay 2,5 s de gracia | 2 tests |
 | Gráficos | Mapa de noche con luna y estrellas, lámparas que cambian al prender la luz, tiza en las paredes, máquinas, tablas, zombis de cajas con ojos que brillan | Capturas |
 | Sonido | Generado por código: tiros por clase, gruñidos, tablas, máquinas, rondas, la canción | **No lo escuché**: el navegador de prueba no tiene salida |
 
@@ -25,10 +28,9 @@ Lo que hay, lo que quedó en la lista y por qué. Primera versión: 2 de noviemb
 1. **Probarlo con gente.** Todo lo de arriba se probó solo y con un apuntador automático. Hace
    falta jugarlo de verdad: si los zombis son muy lentos o muy rápidos, si los precios cierran, si
    las rondas altas se ponen imposibles. Los números viven en `constants.ts`.
-2. **El easter egg grande.** Las radios son el gancho. La idea es una cadena: la canción abre una
-   trampa, la trampa pide la luz y el Pack-a-Punch, y al final hay algo (un arma que no sale de
-   la caja, o terminar la partida con un final). Se puede construir con lo que hay: puertas que no
-   se compran sino que se abren por evento, interacciones nuevas en `findInteraction`.
+2. **El easter egg grande.** Ya hay cadena (radios → armario → piezas → banco → Thunder Gun).
+   Lo que sigue: que armarla abra otra cosa (una trampa, un final), y que las piezas cambien de
+   lugar según la semilla para que no sea siempre igual.
 3. **Rondas de perros.** Cada 5 o 6 rondas una de perros rápidos y débiles que aparecen con un
    rayo. El tipo de zombi ya existe (`type`); harían falta otro modelo y otra velocidad.
 4. **Más armas de verdad.** Thundergun, Monkey Bomb, ballestas. El Monkey Bomb es fácil: una
