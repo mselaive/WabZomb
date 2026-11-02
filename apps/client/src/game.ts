@@ -603,7 +603,7 @@ export class Game {
         if (ev.step === 4) {
           // Un alma más en el horno: un golpe grave, y el número cada tanto.
           this.audio.soul(ev.souls ?? 0);
-          if ((ev.souls ?? 0) % 5 === 0 || (ev.souls ?? 0) <= 2) this.ui.showBanner(`Almas: ${ev.souls ?? 0} de ${EGG_SOULS}`, "blood", 1400);
+          if ((ev.souls ?? 0) % 10 === 0 || (ev.souls ?? 0) <= 2) this.ui.showBanner(`Almas: ${ev.souls ?? 0} de ${EGG_SOULS}`, "blood", 1400);
           return;
         }
         this.audio.powerUp();

@@ -279,13 +279,12 @@ body {
   }
 }
 
-/* La ronda, abajo a la izquierda como en el original: el número grande en rojo sangre. */
+/* La ronda, arriba a la izquierda: el número grande en rojo sangre, y debajo los mensajes. */
 .round-box {
   position: absolute;
   left: 22px;
-  bottom: 120px;
-  text-align: center;
-  width: 110px;
+  top: 14px;
+  text-align: left;
 }
 
 .round-number {
@@ -367,14 +366,13 @@ body {
 
 .banner {
   position: absolute;
-  top: 24%;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 118px;
+  left: 22px;
+  max-width: 44vw;
   font-family: var(--display);
-  font-size: 46px;
+  font-size: 34px;
   letter-spacing: 2px;
-  text-align: center;
-  white-space: nowrap;
+  text-align: left;
   color: var(--ink);
 }
 
@@ -388,12 +386,13 @@ body {
 
 .sub-banner {
   position: absolute;
-  top: calc(24% + 60px);
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 20px;
+  top: 164px;
+  left: 22px;
+  max-width: 44vw;
+  font-size: 17px;
+  line-height: 1.3;
   color: var(--ink);
-  text-align: center;
+  text-align: left;
 }
 
 /* Lo que hace E: arriba de la mira. */
@@ -613,7 +612,7 @@ body {
 .mates {
   position: absolute;
   left: 18px;
-  top: 18px;
+  top: 240px;
   display: grid;
   gap: 6px;
 }

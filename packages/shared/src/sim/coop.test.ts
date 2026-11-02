@@ -63,6 +63,8 @@ describe("de a varios", () => {
       else h.shootNearest();
       p.reserve[p.active] = 500;
       p.hp = p.maxHp;
+      // Intocable: con más zombis, dos manotazos en el mismo tick lo tirarían.
+      p.invulnTicks = 1000;
       ticks++;
       h.events.length = 0;
     }

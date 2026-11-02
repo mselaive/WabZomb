@@ -293,7 +293,7 @@ export const EGG_BUILT = 16;
 export const EGG_FURNACE = 32;
 export const EGG_PART_NAMES = ["el núcleo", "la bobina", "el gatillo"] as const;
 /** Zombis que hay que matar al lado del horno (a menos de SOUL_RANGE) para que suelte el gatillo. Sólo después de las radios. */
-export const EGG_SOULS = 15;
+export const EGG_SOULS = 40;
 export const SOUL_RANGE = 5;
 /** Lo que cuenta cada radio (el diario del ingeniero). */
 export const EGG_RADIO_NOTES = [

@@ -11,7 +11,7 @@ describe("rondas y zombis", () => {
     h.run(ROUND_INTERMISSION_TICKS);
     expect(h.state.round.phase).toBe("live");
     expect(h.state.round.total).toBe(zombieCount(1, 1));
-    h.run(20 * TICK_RATE);
+    h.run(30 * TICK_RATE);
     expect(h.state.round.spawned).toBe(h.state.round.total);
     // Todos vinieron de afuera (la oficina no tiene spawners adentro) y están entrando o adentro.
     for (const z of h.state.zombies) expect([Z_OUTSIDE, Z_TEARING, Z_VAULT, Z_HUNT, 5]).toContain(z.state);

@@ -16,6 +16,7 @@ import {
   TEX_METAL,
   TEX_WOOD,
   BOX_POOL,
+  EGG_SOULS,
   weapon,
   weaponStats,
   type Box,
@@ -543,7 +544,7 @@ export class World {
     }
     // El horno: la boca brilla más cuanto más lleno, y llama cuando ya escupió.
     if (this.furnaceMouth && this.furnaceLight) {
-      const k = (egg & 32) !== 0 ? 1 : Math.min(1, souls / 15);
+      const k = (egg & 32) !== 0 ? 1 : Math.min(1, souls / EGG_SOULS);
       const flicker = 0.85 + Math.sin(t * 17) * 0.08 + Math.sin(t * 31) * 0.07;
       (this.furnaceMouth.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.2 + 2.4 * k * flicker;
       this.furnaceLight.intensity = (0.3 + 3.5 * k) * flicker;

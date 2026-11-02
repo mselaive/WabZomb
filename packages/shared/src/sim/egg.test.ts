@@ -169,6 +169,10 @@ describe("el easter egg", () => {
     for (let i = 0; i < EGG_SOULS + 2; i++) {
       const zb = zombieAt(h, p.x, p.z - 2.5);
       zb.hp = 1;
+      // Que no lo tiren mientras tanto: son 40 y pegan.
+      p.invulnTicks = 1000;
+      // Y sin retroceso acumulado: cuarenta tiros seguidos abren mucho la dispersión.
+      p.recoil = 0;
       // La cadencia de la pistola: soltar el gatillo unos ticks entre tiro y tiro.
       h.run(4, { 1: { shoot: false, yaw: 0, pitch: p.pitch } });
       h.tick({ 1: { shoot: true, yaw: 0, pitch: p.pitch } });
