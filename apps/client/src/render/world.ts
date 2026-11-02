@@ -571,7 +571,7 @@ export class World {
     g.add(light);
     const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture("El horno", "#ff9a5a", 256, 34), transparent: true, depthTest: true }));
     label.scale.set(1.2, 0.3, 1);
-    label.position.y = 2.2;
+    label.position.y = 2.6;
     g.add(label);
     g.position.set(f.x, 0, f.z);
     g.rotation.y = f.yaw;

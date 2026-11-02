@@ -294,6 +294,8 @@ function build(): GameMap {
   // ---- Calderas: dos calderas grandes (la segunda es el horno), tubos y la tarima de la llave de la luz.
   for (const x of [-25, -12]) boxes.push({ ...box(x - 1.3, 0, -21.3, x + 1.3, 3.6, -18.7, TEX_RUST), shape: "cyl" });
   boxes.push(box(-26.3, 2.8, -22, -10.7, 3.2, -21.6, TEX_RUST));
+  boxes.push(box(-13.1, 0, -19.5, -10.9, 2.2, -18.1, TEX_RUST));
+  boxes.push(box(-12.7, 0, -18.1, -11.3, 0.5, -17.5, TEX_METAL));
   boxes.push({ ...box(-19, 0, -14, -17.5, 2.2, -12.5, TEX_RUST), shape: "cyl" });
   boxes.push(box(-21, 0, -23.8, -15, 0.25, -22.4, TEX_METAL));
   boxes.push(barrel(-27, -11));
@@ -398,6 +400,9 @@ function build(): GameMap {
     { x: 2, y: 0, z: 12.8, yaw: Math.PI },
   ];
 
+  // Las puertas se buscan por posición en la lista (y por bit en doorsOpen): en orden de número.
+  doors.sort((a, b) => a.id - b.id);
+
   return {
     name: "La Fábrica",
     boxes,
@@ -420,10 +425,10 @@ function build(): GameMap {
     eggParts: [
       { x: -10, y: 1.1, z: -12.8, door: 6 },
       { x: 11.75, y: 2.75, z: 3 },
-      { x: -12, y: 0.9, z: -17.9, souls: true },
+      { x: -12, y: 0.85, z: -17.8, souls: true },
     ],
     bench: { x: 10, z: -21.9, yaw: Math.PI, zone: 4 },
-    furnace: { x: -12, z: -18.2, yaw: Math.PI, zone: 3 },
+    furnace: { x: -12, z: -18.05, yaw: Math.PI, zone: 3 },
     bounds: { minX: -52, minZ: -32, maxX: 52, maxZ: 26 },
     sky: 0x0b1020,
   };

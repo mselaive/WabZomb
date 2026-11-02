@@ -37,6 +37,31 @@ describe("comprar y usar", () => {
     expect(h.events.some((e) => e.t === "door" && e.id === 0)).toBe(true);
   });
 
+  it("cada puerta abre la suya y se puede pasar: vestuarios y estacionamiento", () => {
+    for (const [name, x, z, yaw, past] of [
+      ["Puerta de los vestuarios", -28, 7.1, Math.PI / 2, (v: number) => v < -30.5],
+      ["Portón del estacionamiento", 28, 2.1, -Math.PI / 2, (v: number) => v > 30.5],
+    ] as const) {
+      const h = harness(1);
+      const p = h.state.players[0]!;
+      h.state.round.ticksLeft = 100_000;
+      const door = h.map.doors.find((d) => d.name === name)!;
+      h.state.doorsOpen = 0b11;
+      const before = h.state.doorsOpen;
+      p.points = 1000;
+      pressAt(h, x, z);
+      expect(h.state.doorsOpen, name).toBe(before | (1 << door.id));
+      expect(p.points, name).toBe(0);
+      h.run(30, { 1: { fwd: 1, yaw } });
+      expect(past(p.x), name + " " + p.x).toBe(true);
+    }
+  });
+
+  it("el lugar de cada puerta en la lista es su número", () => {
+    const h = harness(1);
+    h.map.doors.forEach((d, i) => expect(d.id).toBe(i));
+  });
+
   it("un arma de pared: se compra, y la segunda vez es munición a mitad de precio", () => {
     const h = harness(1);
     const p = h.state.players[0]!;
