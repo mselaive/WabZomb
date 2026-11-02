@@ -21,6 +21,8 @@ export interface Box {
   thin?: boolean;
   /** Choca pero no se dibuja (el hueco de una ventana: las tablas las dibuja el cliente aparte). */
   hidden?: boolean;
+  /** Pared invisible sobre un mueble: frena a jugadores y zombis, no a las balas ni a las granadas. Es lo que impide subirse a donde un zombi no llega. */
+  clip?: boolean;
 }
 
 export interface Spawn {

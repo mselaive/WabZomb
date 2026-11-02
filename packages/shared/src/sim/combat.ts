@@ -44,7 +44,7 @@ import type { Box } from "../map/types.js";
 import { KNIFE, SLOT_COUNT, weapon, weaponStats, type WeaponDef } from "../weapons.js";
 import { eyeHeightOf, hasPerk, heightOf, isSprinting, overlapsAny } from "./movement.js";
 import { dropPowerUp } from "./powerups.js";
-import { HIT_BODY, HIT_HEAD, HIT_NONE, HIT_WORLD, type Body, type GameState, type PlayerInput, type PlayerState, type SimEvent, type ZombieState } from "./types.js";
+import { HIT_BODY, HIT_HEAD, HIT_NONE, HIT_WORLD, type Body, type GameState, type PlayerInput, type PlayerState, type SimEvent, type ZombieState, Z_OUTSIDE, Z_TEARING } from "./types.js";
 
 const MAX_RANGE = 200;
 const RECOIL_COOL_TICKS = 3;
@@ -395,12 +395,14 @@ export function resolveMelee(state: GameState, p: PlayerState, seq: number, even
   const ey = p.y + eyeHeightOf(p);
   const ez = p.z;
   let best: ZombieState | null = null;
-  let bestD = KNIFE_RANGE + ZOMBIE_HALF_W;
+  let bestD = Infinity;
   for (const z of state.zombies) {
     const dx = z.x - ex;
     const dz = z.z - ez;
     const d = Math.hypot(dx, dz);
-    if (d > bestD || Math.abs(z.y + ZOMBIE_HEIGHT * 0.5 - ey) > 1.6) continue;
+    // A través de la ventana se llega un poco más: el muro hace de separación.
+    const atWindow = z.state === Z_OUTSIDE || z.state === Z_TEARING;
+    if (d > KNIFE_RANGE + ZOMBIE_HALF_W + (atWindow ? 0.5 : 0) || d >= bestD || Math.abs(z.y + ZOMBIE_HEIGHT * 0.5 - ey) > 1.6) continue;
     // Delante: el ángulo con la mirada menor a ~50°.
     const dot = (dx * fwd.x + dz * fwd.z) / Math.max(0.001, d);
     if (dot < 0.6) continue;

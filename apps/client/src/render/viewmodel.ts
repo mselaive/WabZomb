@@ -676,8 +676,9 @@ export class ViewModel {
         this.bottle.visible = drinkDown > 0.05;
         const up = drinkDown;
         const tilt = Math.sin(Math.PI * Math.max(0, Math.min(1, (t - 0.25) / 0.5)));
-        this.bottle.position.set(-0.08 + 0.02 * tilt, -0.3 + 0.2 * up + 0.08 * tilt, -0.02 - 0.06 * tilt);
-        this.bottle.rotation.set(-1.1 * tilt, 0.3, 0.25 + 0.2 * tilt);
+        // Sube delante de la cara y se empina: la boca hacia la cámara (+Z), el fondo arriba.
+        this.bottle.position.set(-0.12 - 0.07 * tilt, -0.42 + 0.3 * up + 0.29 * tilt, -0.08 + 0.1 * tilt);
+        this.bottle.rotation.set(1.85 * tilt, 0, 0.12 * (1 - tilt));
       }
     } else if (this.bottle) {
       this.root.remove(this.bottle);

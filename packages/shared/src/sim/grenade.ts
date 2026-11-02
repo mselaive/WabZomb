@@ -36,19 +36,19 @@ export function advanceGrenade(g: GrenadeState, boxes: readonly Box[]): void {
   let onGround = false;
   g.x += g.vx * DT;
   for (const b of boxes) {
-    if (b.decal || !overlaps(b, g.x, g.y, g.z, r)) continue;
+    if (b.decal || b.clip || !overlaps(b, g.x, g.y, g.z, r)) continue;
     g.x = g.vx > 0 ? b.minX - r : b.maxX + r;
     g.vx = -g.vx * GRENADE_BOUNCE;
   }
   g.z += g.vz * DT;
   for (const b of boxes) {
-    if (b.decal || !overlaps(b, g.x, g.y, g.z, r)) continue;
+    if (b.decal || b.clip || !overlaps(b, g.x, g.y, g.z, r)) continue;
     g.z = g.vz > 0 ? b.minZ - r : b.maxZ + r;
     g.vz = -g.vz * GRENADE_BOUNCE;
   }
   g.y += g.vy * DT;
   for (const b of boxes) {
-    if (b.decal || !overlaps(b, g.x, g.y, g.z, r)) continue;
+    if (b.decal || b.clip || !overlaps(b, g.x, g.y, g.z, r)) continue;
     if (g.vy <= 0) {
       g.y = b.maxY + r;
       g.vy = Math.abs(g.vy) > 2 ? -g.vy * GRENADE_BOUNCE : 0;

@@ -5,7 +5,7 @@ import { applyPerk, downPlayer, resolveShot } from "./combat.js";
 import { harness } from "./helpers.test-util.js";
 import { findInteraction } from "./interact.js";
 import { collisionBoxes, stepPlayerMovement } from "./movement.js";
-import { Z_HUNT } from "./types.js";
+import { Z_HUNT, Z_TEARING } from "./types.js";
 import { createZombie } from "./zombies.js";
 
 function pressAt(h: ReturnType<typeof harness>, x: number, z: number, id = 1): void {
@@ -98,6 +98,61 @@ describe("caído con Quick Revive", () => {
   });
 });
 
+describe("alturas", () => {
+  const jumpAt = (h: ReturnType<typeof harness>, x: number, z: number, yaw: number) => {
+    const p = h.state.players[0]!;
+    const boxes = collisionBoxes(h.state, h.map);
+    p.x = x;
+    p.z = z;
+    p.y = 0;
+    p.vx = p.vy = p.vz = 0;
+    p.onGround = true;
+    let top = 0;
+    for (let i = 0; i < 80; i++) {
+      stepPlayerMovement(p, { seq: i, fwd: 1, side: 0, yaw, pitch: 0, shoot: false, reload: false, jump: true, crouch: false, sprint: false, scope: false, use: false, melee: false, act: 0, view: -1 }, boxes, true);
+      if (p.onGround) top = Math.max(top, p.y);
+    }
+    return top;
+  };
+
+  it("no se puede subir a los muebles: mesadas del laboratorio, barril y lockers", () => {
+    const h = harness(1);
+    expect(jumpAt(h, 0, -3.2, 0)).toBeLessThan(0.1);
+    expect(jumpAt(h, -4, -4.3, 0)).toBeLessThan(0.1);
+    expect(jumpAt(h, -30.5, -5.5, 0)).toBeLessThan(0.1);
+    expect(jumpAt(h, -36, -6.5, 0)).toBeLessThan(0.1);
+    expect(jumpAt(h, 13.5, 3, Math.PI / 2)).toBeLessThan(0.1);
+  });
+
+  it("a la plataforma de carga se sigue subiendo: ahí los zombis también llegan", () => {
+    const h = harness(1);
+    expect(jumpAt(h, 26, 11, 0)).toBeGreaterThan(0.7);
+  });
+
+  it("las paredes invisibles no se dibujan ni frenan balas", () => {
+    const h = harness(1);
+    expect(h.map.boxes.some((b) => b.clip)).toBe(true);
+    expect(h.map.boxes.filter((b) => b.clip).every((b) => b.thin && b.hidden)).toBe(true);
+  });
+});
+
+describe("cuchillo", () => {
+  it("llega al zombi que arranca tablas, pegado a la ventana desde adentro", () => {
+    const h = harness(1);
+    const p = h.state.players[0]!;
+    h.state.round.ticksLeft = 100_000;
+    const w = h.map.barriers[1]!;
+    p.x = w.inside.x;
+    p.z = 17.69;
+    const zb = zombieAt(h, w.outside.x, w.outside.z);
+    zb.barrier = w.id;
+    zb.state = Z_TEARING;
+    zb.stateTicks = 30;
+    h.tick({ 1: { melee: true, yaw: Math.PI, pitch: 0 } });
+    expect(h.state.zombies).not.toContain(zb);
+  });
+});
+
 describe("zombis perdidos", () => {
   it("un zombi que no se acerca a nadie en 40 s vuelve a la cola", () => {
     const h = harness(1);
@@ -132,28 +187,22 @@ describe("el easter egg", () => {
     pressAt(h, a.x + 0.9, a.z + 0.5);
     expect(h.state.egg & EGG_PART_A).toBe(0);
     // Sin luz, las radios no hacen nada.
-    const r0 = h.map.radios[0]!;
-    p.y = Math.max(0, r0.y - 1.2);
-    p.x = r0.x + 0.5;
-    p.z = r0.z;
+    // Todas se alcanzan parado en el piso, al lado del mueble.
+    const radioSpots = [[-27, 14.1], [24, -3.2], [-4.5, -12.6]] as const;
+    p.x = radioSpots[0][0];
+    p.z = radioSpots[0][1];
     expect(findInteraction(h.state, p, h.map)?.ok).toBe(false);
     h.state.power = true;
-    for (const r of h.map.radios) {
-      p.y = Math.max(0, r.y - 1.2);
-      pressAt(h, r.x + 0.5, r.z);
-    }
-    p.y = 0;
+    for (const [x, z] of radioSpots) pressAt(h, x, z);
     expect(h.state.egg & EGG_SONG).toBe(EGG_SONG);
     expect(h.state.doorsOpen & (1 << locker.id)).not.toBe(0);
     expect(h.state.songTicks).toBeGreaterThan(0);
     // Ahora sí, el núcleo.
     pressAt(h, a.x + 0.9, a.z + 0.5);
     expect(h.state.egg & EGG_PART_A).toBe(EGG_PART_A);
-    // La bobina, arriba del contenedor.
+    // La bobina, arriba del contenedor: se agarra desde el piso.
     const b = h.map.eggParts[1]!;
-    p.y = b.y - 0.1;
-    pressAt(h, b.x, b.z + 0.5);
-    p.y = 0;
+    pressAt(h, 13.4, b.z);
     expect(h.state.egg & EGG_PART_B).toBe(EGG_PART_B);
     // El gatillo no está hasta que el horno se llena.
     const c = h.map.eggParts[2]!;

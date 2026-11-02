@@ -298,7 +298,7 @@ export const SOUL_RANGE = 5;
 /** Lo que cuenta cada radio (el diario del ingeniero). */
 export const EGG_RADIO_NOTES = [
   "Diario del ingeniero, día 3: el gerente guardó el núcleo bajo llave en su armario de las calderas. Dice que la música lo calma.",
-  "Día 9: la bobina no aguanta la carga. La dejé enfriando arriba del contenedor chico del patio. No bajen la escalera de cajones.",
+  "Día 9: la bobina no aguanta la carga. La dejé enfriando arriba del contenedor chico del patio: se alcanza desde el piso.",
   "Día 14: el horno se come todo lo que le damos. Si le damos lo suficiente, devuelve lo que falta. Después, al banco del taller.",
 ] as const;
 /** Lo que se cuenta en cada paso: pieza 0, 1, 2 y el arma armada. */

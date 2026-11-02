@@ -29,7 +29,7 @@ import {
   type Zone,
 } from "./types.js";
 import { AK74U, FRAG, M14, M16, MP40, MP5K, OLYMPIA, PM63, PYTHON, STAKEOUT } from "../weapons.js";
-import { PERK_DOUBLETAP, PERK_JUGG, PERK_MULE, PERK_QUICK, PERK_SPEED, PERK_STAMIN } from "../constants.js";
+import { PERK_DOUBLETAP, PERK_JUGG, PERK_MULE, PERK_QUICK, PERK_SPEED, PERK_STAMIN, STEP_HEIGHT } from "../constants.js";
 
 /**
  * "La Fábrica": una fábrica abandonada de noche, 90 x 44 m adentro del muro,
@@ -152,7 +152,7 @@ function build(): GameMap {
       id,
       zone,
       box: box(from, 0.8, at, to, 2.4, at + T, TEX_BRICK),
-      outside: { x: cx, z: at + T / 2 + outsideDir * 1.3 },
+      outside: { x: cx, z: at + T / 2 + outsideDir * 0.95 },
       inside: { x: cx, z: at + T / 2 - outsideDir * 1.4 },
       yaw: outsideDir > 0 ? Math.PI : 0,
     });
@@ -167,7 +167,7 @@ function build(): GameMap {
       id,
       zone,
       box: box(at, 0.8, from, at + T, 2.4, to, TEX_BRICK),
-      outside: { x: at + T / 2 + outsideDir * 1.3, z: cz },
+      outside: { x: at + T / 2 + outsideDir * 0.95, z: cz },
       inside: { x: at + T / 2 - outsideDir * 1.4, z: cz },
       yaw: outsideDir > 0 ? -Math.PI / 2 : Math.PI / 2,
     });
@@ -275,7 +275,8 @@ function build(): GameMap {
   // ---- Patio: contenedores, un camión, una plataforma de carga con escalón, barriles y sacos.
   boxes.push(box(21, 0, -6, 27, 2.6, -3.6, TEX_CONTAINER));
   boxes.push(box(10.5, 0, 0, 13, 2.6, 6, TEX_CONTAINER));
-  boxes.push(box(22, 0, 5, 28.5, 0.8, 9.5, TEX_CONCRETE));
+  const dock = box(22, 0, 5, 28.5, 0.8, 9.5, TEX_CONCRETE);
+  boxes.push(dock);
   boxes.push(box(22, 0, 9.5, 28.5, 0.4, 10.5, TEX_CONCRETE));
   boxes.push(crate(24, 7.2, 1.0, 0.8, TEX_WOOD));
   // El camión: la caja y la cabina, estacionado contra el sur.
@@ -286,9 +287,6 @@ function build(): GameMap {
   boxes.push(barrel(14.2, 16.1));
   boxes.push(box(16, 0, -1, 19, 0.9, -0.4, TEX_SANDBAG));
   boxes.push(crate(10, 16.5, 1.2));
-  // Dos cajones apilados contra el contenedor chico: por ahí se sube al techo (la bobina está arriba).
-  boxes.push(crate(14.2, 3, 1.2));
-  boxes.push(crate(14.2, 3, 1.2, 1.2, TEX_WOOD));
   boxes.push(pillar(19, 4, 3.2, 0.3));
 
   // ---- Calderas: dos calderas grandes (la segunda es el horno), tubos y la tarima de la llave de la luz.
@@ -399,6 +397,15 @@ function build(): GameMap {
     { x: -2, y: 0, z: 12.8, yaw: Math.PI },
     { x: 2, y: 0, z: 12.8, yaw: Math.PI },
   ];
+
+  // Los zombis no saltan: nada que necesite un salto se puede pisar, o sería un lugar
+  // donde no te llegan. Arriba de cada mueble va una pared invisible (lo que se sube
+  // caminando, como la plataforma de carga, queda libre: ahí los zombis también suben).
+  for (const b of [...boxes]) {
+    if (b.decal || b.hidden || b.thin || b === dock) continue;
+    if (b.maxY <= STEP_HEIGHT + 0.01 || b.maxY >= ROOF_Y - 0.5) continue;
+    boxes.push({ ...box(b.minX, b.maxY, b.minZ, b.maxX, 9, b.maxZ, b.tex), hidden: true, thin: true, clip: true });
+  }
 
   // Las puertas se buscan por posición en la lista (y por bit en doorsOpen): en orden de número.
   doors.sort((a, b) => a.id - b.id);
