@@ -140,6 +140,8 @@ export interface ZombieState extends Body {
   lastX: number;
   lastZ: number;
   /** El punto de la ventana al que va mientras está afuera. */
+  /** Último tick en que estuvo cerca de alguien (o pegando): si pasa mucho sin eso, está trabado en algún lado y se lo recicla. */
+  engagedAt: number;
   goalX: number;
   goalZ: number;
 }
@@ -231,6 +233,8 @@ export interface GameState {
   songTicks: number;
   /** El easter egg: bits EGG_*. Las piezas son de todos. */
   egg: number;
+  /** Almas juntadas en el horno (zombis muertos cerca), hasta EGG_SOULS. */
+  eggSouls: number;
   /** A qué ronda llegaron (cuando termina). */
   reachedRound: number;
   seed: number;
@@ -283,6 +287,6 @@ export type SimEvent =
   /** Un zombi que sale del piso, arranca una tabla, o pasa la ventana (para el sonido). */
   | { t: "zombie"; what: "rise" | "tear" | "vault" | "groan"; id: number; x: number; y: number; z: number }
   | { t: "radio"; byId: number; which: number; all: boolean }
-  /** El easter egg avanza: una pieza agarrada (0, 1, 2), o la Thunder Gun armada (3). */
-  | { t: "egg"; byId: number; step: number }
+  /** El easter egg avanza: una pieza agarrada (0, 1, 2), la Thunder Gun armada (3), o un alma más en el horno (4, con `souls`). */
+  | { t: "egg"; byId: number; step: number; souls?: number }
   | { t: "gameover"; round: number };

@@ -10,10 +10,10 @@ describe("La Fábrica", () => {
   const map = FABRICA;
   const grid = navGridFor(map);
 
-  it("tiene seis zonas conectadas por las puertas, con la oficina de arranque", () => {
-    expect(map.zones.length).toBe(6);
+  it("tiene ocho zonas conectadas por las puertas, con la oficina de arranque", () => {
+    expect(map.zones.length).toBe(8);
     const all = openZones({ doorsOpen: (1 << map.doors.length) - 1 }, map);
-    expect(all.size).toBe(6);
+    expect(all.size).toBe(8);
     expect(openZones({ doorsOpen: 0 }, map).size).toBe(1);
     // Por el depósito o por el patio se llega al laboratorio: dos caminos.
     expect(openZones({ doorsOpen: (1 << 0) | (1 << 2) | (1 << 4) }, map).has(5)).toBe(true);

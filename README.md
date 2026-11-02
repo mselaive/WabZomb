@@ -42,7 +42,8 @@ Los puertos son distintos de los de WabCS (5173 y 8787) para poder tener los dos
 
 - Los zombis vienen por **rondas**. Cada ronda trae más (y con más vida: 150 en la primera, +100
   por ronda hasta la 9, después un 10 % más por ronda). Primero caminan; de la ronda 4 en adelante
-  cada vez más corren. Hasta 24 vivos a la vez.
+  cada vez más corren. Hasta 24 vivos a la vez. Uno que se trabe en algún rincón y no se acerque a
+  nadie en 40 s vuelve a la cola y sale por otro lado: la ronda nunca se queda colgada.
 - Entran por las **ventanas**: arrancan las tablas una por una y pasan. Con `E` sostenida se
   reponen (10 puntos por tabla, hasta 10 por ronda). En las salas del fondo también salen del piso.
 - Todo se paga con **puntos**: 10 por tiro que pega, 60 por baja, 100 en la cabeza, 130 con el
@@ -56,7 +57,7 @@ Los puertos son distintos de los de WabCS (5173 y 8787) para poder tener los dos
 
 ### El mapa: La Fábrica
 
-Una fábrica abandonada de noche, seis zonas y dos caminos para dar la vuelta entera.
+Una fábrica abandonada de noche, ocho zonas y dos caminos para dar la vuelta entera.
 
 | Zona | Cómo se llega | Qué hay |
 |---|---|---|
@@ -66,13 +67,15 @@ Una fábrica abandonada de noche, seis zonas y dos caminos para dar la vuelta en
 | Calderas | escombros 1000 (desde el depósito) | **la luz**, Juggernog, M16 (1200), un lugar de la caja |
 | Taller | reja 1000 (desde el patio) | AK74u (1200), Speed Cola, un lugar de la caja |
 | Laboratorio | puerta 1250 (desde las calderas o el taller) | **Pack-a-Punch**, MP5K (1000), Mule Kick |
+| Vestuarios | puerta 1000 (desde el depósito) | Python (1200), lockers, duchas, un lugar de la caja |
+| Estacionamiento | portón 1000 (desde el patio) | a cielo abierto: PM63 (1000), autos abandonados, un lugar de la caja |
 
 ### Lo que se compra
 
 - **Armas de pared**: la tiza en la pared. La primera vez te la da cargada; si ya la tenés, te vende
   la munición a mitad de precio (4500 si está mejorada).
-- **Caja misteriosa** (950): arranca en cualquiera de sus cuatro lugares (depósito, patio,
-  calderas o taller: siempre antes del laboratorio) y da un arma al azar de las 20 que hay,
+- **Caja misteriosa** (950): arranca en cualquiera de sus seis lugares (depósito, patio,
+  calderas, taller, vestuarios o estacionamiento: nunca en el laboratorio) y da un arma al azar de las 20 que hay,
   incluida la Ray Gun (rara). La deja a la vista 10 s para agarrarla con `E`. A partir de la quinta
   vuelta puede salir el **osito**: te devuelve la plata y la caja se muda. Con **Fire Sale** sale 10.
 - **La luz**: la palanca de las calderas. Sin luz no andan las bebidas (salvo Quick Revive) ni el
@@ -113,12 +116,14 @@ distancia; los fusiles casi nada.
 
 ### El easter egg
 
-Hay tres radios viejas escondidas en el mapa. Prenderlas las tres con `E` hace sonar una canción
-para todos... y abre algo que estaba con llave. De ahí en adelante hay tres piezas para juntar (una
-de ellas la da la caja misteriosa, pero sólo cuando ya tenés las otras dos) y un banco de trabajo
-en el que se arma la **Thunder Gun**: un soplido que se lleva a todos los zombis que tenga
-adelante, 2 tiros por cargador. Mejorada es la **Zeus Cannon**. Dónde está cada cosa, no lo dice
-el README.
+Hay tres radios viejas escondidas en el mapa, y sin corriente no dicen nada. Con la luz
+prendida, cada una cuenta una página del diario del ingeniero: qué estaba haciendo la fábrica y
+dónde quedaron las piezas. Las tres juntas hacen sonar una canción y abren algo que estaba con
+llave. De ahí en adelante hay tres piezas para juntar: una bajo llave, una arriba de algo, y una
+que la escupe **el horno** de las calderas cuando se le dieron suficientes almas (zombis muertos
+al lado). Con las tres, en el banco de trabajo del taller se arma la **Thunder Gun**: un soplido
+que se lleva a todos los zombis que tenga adelante, 2 tiros por cargador. Mejorada es la **Zeus
+Cannon**. Dónde está cada cosa, no lo dice el README.
 
 ## Cómo está hecho
 

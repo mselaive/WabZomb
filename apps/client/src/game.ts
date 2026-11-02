@@ -18,7 +18,12 @@ import {
   HIT_WORLD,
   INTERP_DELAY_MS,
   MS_PER_TICK,
+  EGG_FURNACE,
   EGG_PART_NAMES,
+  EGG_RADIO_NOTES,
+  EGG_SONG,
+  EGG_SOULS,
+  EGG_STEP_NOTES,
   PERK_COLORS,
   PERK_QUICK,
   PERK_SPEED,
@@ -407,7 +412,8 @@ export class Game {
     this.shadow.songTicks = msg.fx[3];
     this.shadow.radios = msg.radios;
     this.shadow.egg = msg.egg;
-    this.world.updateEgg(msg.egg);
+    this.shadow.eggSouls = msg.souls;
+    this.world.updateEgg(msg.egg, msg.souls);
     this.shadow.phase = msg.phase;
     this.shadow.round.number = this.latestRound.number;
     this.world.updateBoards(msg.boards);
@@ -594,9 +600,16 @@ export class Game {
         } else this.audio.buy();
         return;
       case "egg":
+        if (ev.step === 4) {
+          // Un alma más en el horno: un golpe grave, y el número cada tanto.
+          this.audio.soul(ev.souls ?? 0);
+          if ((ev.souls ?? 0) % 5 === 0 || (ev.souls ?? 0) <= 2) this.ui.showBanner(`Almas: ${ev.souls ?? 0} de ${EGG_SOULS}`, "blood", 1400);
+          return;
+        }
         this.audio.powerUp();
-        if (ev.step === 3) this.ui.showBanner("Thunder Gun armada", "gold", 3000, `${this.ui.nameOf(ev.byId)} la armó en el banco del taller`);
-        else this.ui.showBanner(`Una pieza: ${EGG_PART_NAMES[ev.step] ?? ""}`, "gold", 2500, ev.step === 1 && (this.shadow.egg & 2) === 0 ? "Falta el núcleo (y la caja tiene el gatillo)" : "Con las tres, al banco del taller");
+        if (ev.step === 5) this.ui.showBanner("El horno se llenó", "blood", 3500, EGG_STEP_NOTES[2]);
+        else if (ev.step === 3) this.ui.showBanner("Thunder Gun armada", "gold", 4000, EGG_STEP_NOTES[3]);
+        else this.ui.showBanner(`Una pieza: ${EGG_PART_NAMES[ev.step] ?? ""}`, "gold", 4000, ev.step === 2 ? "Con las tres piezas, al banco de trabajo del taller" : EGG_STEP_NOTES[ev.step]);
         return;
       case "box":
         if (ev.what === "open") this.audio.boxOpen();
@@ -652,9 +665,9 @@ export class Game {
         else if (ev.what === "vault") this.audio.vault(ev.x, ev.z);
         return;
       case "radio":
-        this.audio.buy();
-        if (ev.all) this.ui.showBanner("Las tres radios", "gold", 3000, "Algo se escucha... y algo se abrió en las calderas");
-        else this.ui.showBanner("Una radio", "gold", 1500, `${(this.shadow.radios.toString(2).split("1").length - 1)} de 3`);
+        this.audio.radio();
+        // El diario del ingeniero, una entrada por radio; con las tres, la canción y el armario.
+        this.ui.showBanner(ev.all ? "Las tres radios" : `Radio ${(this.shadow.radios.toString(2).split("1").length - 1)} de 3`, "gold", 9000, EGG_RADIO_NOTES[ev.which] ?? "");
         return;
       case "gameover":
         this.audio.gameOver();
@@ -818,7 +831,8 @@ export class Game {
       this.world.updatePap(this.shadow.pap, dt);
       this.world.updateRadios(this.shadow.radios, this.shadow.songTicks > 0);
       this.ui.setRound(frame.round.number, frame.round.phase, frame.round.total, frame.round.killed, frame.zombies.length);
-      this.ui.setEffects(this.shadow.instaKill, this.shadow.doublePoints, this.shadow.fireSale);
+      const soulsOn = (this.shadow.egg & EGG_SONG) !== 0 && (this.shadow.egg & EGG_FURNACE) === 0;
+      this.ui.setEffects(this.shadow.instaKill, this.shadow.doublePoints, this.shadow.fireSale, soulsOn ? this.shadow.eggSouls : -1);
       this.ui.setMates(frame.players.filter((p) => p.id !== this.myId && p.connected));
     }
     // La canción del easter egg.

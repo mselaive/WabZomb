@@ -147,7 +147,7 @@ export const WEAPONS: readonly WeaponDef[] = [
     look: pistolLook(SILVER, 0.2, 0.03, WOOD),
   }),
   W({
-    id: PYTHON, name: "Python", short: "Python", cls: "pistol", wall: 0, box: 1,
+    id: PYTHON, name: "Python", short: "Python", cls: "pistol", wall: 1200, box: 1,
     damage: 110, head: 3, range: 0.9, mag: 6, reserve: 60, fireTicks: 6, reloadTicks: 56, drawTicks: 6, auto: false, pellets: 1,
     spread: 0.009, spreadShot: 0.014, spreadMove: 0.04, speed: 5.0, zoom: 0, kick: 0.035, recoilUp: 0.08, recoilSide: 0.02, explosive: 0,
     pap: { name: "Cobra", damage: 300, mag: 12, reserve: 96 },
@@ -217,7 +217,7 @@ export const WEAPONS: readonly WeaponDef[] = [
     look: { body: 0.28, barrel: 0.22, color: STEEL, wood: WOOD, mag: "curved", magLen: 0.2, stock: "skeleton" },
   }),
   W({
-    id: PM63, name: "PM63", short: "PM63", cls: "smg", wall: 0, box: 1,
+    id: PM63, name: "PM63", short: "PM63", cls: "smg", wall: 1000, box: 1,
     damage: 28, head: 3, range: 0.84, mag: 20, reserve: 200, fireTicks: 2, reloadTicks: 36, drawTicks: 6, auto: true, pellets: 1,
     spread: 0.01, spreadShot: 0.003, spreadMove: 0.03, speed: 5.0, zoom: 0, kick: 0.009, recoilUp: 0.05, recoilSide: 0.03, explosive: 0,
     pap: { name: "Tokyo & Rose", damage: 60, mag: 50, reserve: 300 },

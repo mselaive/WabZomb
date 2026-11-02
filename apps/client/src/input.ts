@@ -238,8 +238,8 @@ export class InputController {
   }
 
   /** ¿Está corriendo ahora mismo (Shift y adelante, de pie, sin la mira)? Para la pose del arma. */
-  sprintingNow(s: { crouch: number; scoped: boolean; down: boolean; alive: boolean }): boolean {
-    return this.enabled && !this.uiBusy && this.any(SPRINT) && this.axis(BACK, FWD) > 0 && s.crouch === 0 && !s.scoped && !s.down && s.alive;
+  sprintingNow(s: { crouch: number; scoped: boolean; down: boolean; alive: boolean; drinkTicks: number }): boolean {
+    return this.enabled && !this.uiBusy && this.any(SPRINT) && this.axis(BACK, FWD) > 0 && s.crouch === 0 && !s.scoped && !s.down && s.alive && s.drinkTicks === 0;
   }
 
   takeShotTrigger(): boolean {

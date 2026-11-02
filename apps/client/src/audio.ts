@@ -359,6 +359,21 @@ export class Audio {
     [660, 880, 1100, 1320].forEach((f, i) => this.tone(f, 0.25, 0.2, 0, "triangle", undefined, i * 0.07));
   }
 
+  /** Un alma que entra al horno: un golpe grave con un soplo; más agudo a medida que se llena. */
+  soul(n: number): void {
+    if (!this.ctx) return;
+    this.tone(70 + n * 6, 0.5, 0.35, 0, "sine", 40);
+    this.noise(0.4, 500 + n * 40, 0.3, 0, "bandpass", 1.2);
+  }
+
+  /** Una radio que se prende: estática y un silbido de sintonía. */
+  radio(): void {
+    if (!this.ctx) return;
+    this.noise(0.5, 2500, 0.25, 0, "bandpass", 0.8);
+    this.tone(1800, 0.5, 0.12, 0, "sine", 600, 0.2);
+    this.tone(440, 0.3, 0.1, 0, "triangle", undefined, 0.7);
+  }
+
   /** Puntos: un clic suave. */
   points(): void {
     if (!this.ctx) return;

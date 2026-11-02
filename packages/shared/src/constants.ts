@@ -276,10 +276,11 @@ export const FOV_SCOPED = 22;
 
 
 /**
- * El easter egg: tres radios escondidas (E) hacen sonar la canción y abren el
- * armario con la primera pieza; la segunda está arriba de un contenedor; la
- * tercera la da la caja cuando ya se tienen las otras dos. Con las tres, en el
- * banco del taller se arma la Thunder Gun.
+ * El easter egg, en orden: la luz; tres radios escondidas (E) con el diario del
+ * ingeniero, que hacen sonar la canción y abren el armario con el núcleo; la
+ * bobina arriba de un contenedor; el horno de las calderas, al que hay que
+ * darle almas (zombis muertos a su lado) para que escupa el gatillo; y el banco
+ * del taller, donde con las tres piezas se arma la Thunder Gun.
  */
 export const EGG_RADIOS = 3;
 export const EGG_SONG_TICKS = 70 * TICK_RATE;
@@ -288,9 +289,25 @@ export const EGG_PART_A = 2;
 export const EGG_PART_B = 4;
 export const EGG_PART_C = 8;
 export const EGG_BUILT = 16;
+/** El horno ya se llenó: escupió el gatillo. */
+export const EGG_FURNACE = 32;
 export const EGG_PART_NAMES = ["el núcleo", "la bobina", "el gatillo"] as const;
-/** La caja ofrece la pieza con este "arma". */
-export const BOX_PART_ITEM = -5;
+/** Zombis que hay que matar al lado del horno (a menos de SOUL_RANGE) para que suelte el gatillo. Sólo después de las radios. */
+export const EGG_SOULS = 15;
+export const SOUL_RANGE = 5;
+/** Lo que cuenta cada radio (el diario del ingeniero). */
+export const EGG_RADIO_NOTES = [
+  "Diario del ingeniero, día 3: el gerente guardó el núcleo bajo llave en su armario de las calderas. Dice que la música lo calma.",
+  "Día 9: la bobina no aguanta la carga. La dejé enfriando arriba del contenedor chico del patio. No bajen la escalera de cajones.",
+  "Día 14: el horno se come todo lo que le damos. Si le damos lo suficiente, devuelve lo que falta. Después, al banco del taller.",
+] as const;
+/** Lo que se cuenta en cada paso: pieza 0, 1, 2 y el arma armada. */
+export const EGG_STEP_NOTES = [
+  "El núcleo todavía late. Falta la bobina del patio y lo que escupa el horno.",
+  "La bobina está fría. El horno de las calderas quiere almas: matá zombis a su lado.",
+  "El horno escupió el gatillo. Con las tres piezas, al banco de trabajo del taller.",
+  "Lo que la fábrica estaba haciendo cuando pasó lo que pasó. Dos tiros por cargador: cuidado.",
+] as const;
 /** La Thunder Gun: hasta dónde llega el soplido y qué tan ancho (coseno del medio ángulo). */
 export const THUNDER_RANGE = 9;
 export const THUNDER_COS = 0.82;

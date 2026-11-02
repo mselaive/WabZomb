@@ -27,6 +27,10 @@ import { Z_ATTACK, Z_HUNT, Z_OUTSIDE, Z_RISING, Z_TEARING, Z_VAULT, type GameSta
 const REPATH_TICKS = 20;
 /** Trabado tanto tiempo, se lo manda de vuelta a aparecer. */
 const STUCK_RESPAWN_TICKS = 160;
+/** Un zombi que lleva esto sin acercarse a nadie (40 s) está trabado en algún rincón: vuelve a la cola y sale por otro lado. */
+const LOST_TICKS = 40 * 20;
+/** A menos de esto de alguien cuenta como "cerca". */
+const ENGAGED_RANGE = 6;
 
 /** Las celdas que tapan las puertas cerradas: por ahí no pasa el A*. */
 export function blockedCells(state: GameState, map: GameMap, grid: NavGrid): Set<number> {
@@ -114,6 +118,7 @@ export function createZombie(state: GameState, s: Spawner, map: GameMap, rng: ()
     stuck: 0,
     lastX: s.x,
     lastZ: s.z,
+    engagedAt: state.tick,
     goalX: b ? b.outside.x : s.x,
     goalZ: b ? b.outside.z : s.z,
   };
@@ -188,6 +193,11 @@ function faceToward(z: ZombieState, x: number, zz: number, k = 0.35): void {
 
 function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly Box[], grid: NavGrid, blocked: ReadonlySet<number>, events: SimEvent[]): boolean {
   const speed = ZOMBIE_SPEEDS[z.type] ?? ZOMBIE_SPEEDS[0];
+  // Perdido: en cualquier estado, si hace 40 s que no se acerca a nadie, se lo recicla.
+  for (const p of state.players) {
+    if (p.connected && p.alive && Math.hypot(p.x - z.x, p.z - z.z) < ENGAGED_RANGE) z.engagedAt = state.tick;
+  }
+  if (state.tick - z.engagedAt > LOST_TICKS) return false;
   if (z.attackCd > 0) z.attackCd--;
 
   switch (z.state) {

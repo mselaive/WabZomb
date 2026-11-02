@@ -98,6 +98,7 @@ export function startMatch(state: GameState, seed: number, map: GameMap, events:
   state.radios = 0;
   state.songTicks = 0;
   state.egg = 0;
+  state.eggSouls = 0;
   state.reachedRound = 0;
   // La caja arranca en cualquiera de sus lugares: en cada partida hay que salir a buscarla.
   state.box.spot = Math.floor((state.rng ?? Math.random)() * Math.max(1, map.boxSpots.length));

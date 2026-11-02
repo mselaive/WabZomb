@@ -28,26 +28,28 @@ import {
   type WallWeapon,
   type Zone,
 } from "./types.js";
-import { AK74U, FRAG, M14, M16, MP40, MP5K, OLYMPIA, STAKEOUT } from "../weapons.js";
+import { AK74U, FRAG, M14, M16, MP40, MP5K, OLYMPIA, PM63, PYTHON, STAKEOUT } from "../weapons.js";
 import { PERK_DOUBLETAP, PERK_JUGG, PERK_MULE, PERK_QUICK, PERK_SPEED, PERK_STAMIN } from "../constants.js";
 
 /**
- * "La Fábrica": una fábrica abandonada de noche, 60 x 44 m adentro del muro,
+ * "La Fábrica": una fábrica abandonada de noche, 90 x 44 m adentro del muro,
  * con una franja de tierra alrededor de donde vienen los zombis.
  *
- *            norte (-Z)
- *   +-----------+-------+-----------+
- *   | Calderas  |  Lab  |  Taller   |   Calderas: la luz y Juggernog.
- *   |  (1000)   | (PaP) |  (1000)   |   Lab: el Pack-a-Punch y Mule Kick, al fondo.
- *   +-----------+-------+-----------+
- *   | Depósito  |███████|   Patio   |   Depósito: caja, MP40, Stamin-Up. Patio: a cielo abierto, Double Tap.
- *   |   (750)   |Oficina|   (750)   |   Oficina: se arranca acá, con Quick Revive y dos armas baratas.
- *   +-----------+-------+-----------+
- *            sur (+Z)
+ *                     norte (-Z)
+ *              +-----------+-------+-----------+
+ *              | Calderas  |  Lab  |  Taller   |   Calderas: la luz, Juggernog y el horno.
+ *              |  (1000)   | (PaP) |  (1000)   |   Lab: el Pack-a-Punch y Mule Kick, al fondo.
+ *   +----------+-----------+-------+-----------+------------+
+ *   |Vestuarios| Depósito  |███████|   Patio   |Estaciona-  |   Depósito: MP40, Stamin-Up. Patio: a cielo abierto, Double Tap.
+ *   |  (1000)  |   (750)   |Oficina|   (750)   | miento(1000)|   Oficina: se arranca acá, con Quick Revive y dos armas baratas.
+ *   +----------+-----------+-------+-----------+------------+
+ *                     sur (+Z)
  *
  * Las puertas cuestan lo que dice el paréntesis. Los dos caminos (por el
  * depósito o por el patio) llegan a la luz y al laboratorio: se puede dar la
- * vuelta entera, que es lo que hace falta para correr en círculos.
+ * vuelta entera, que es lo que hace falta para correr en círculos. Los
+ * vestuarios y el estacionamiento son los callejones sin salida: más lugar para
+ * correr, y la caja puede caer ahí.
  */
 
 const WALL_H = 5;
@@ -68,6 +70,17 @@ const box = (minX: number, minY: number, minZ: number, maxX: number, maxY: numbe
 const crate = (x: number, z: number, s = 1.2, y = 0, tex = TEX_CRATE): Box => box(x - s / 2, y, z - s / 2, x + s / 2, y + s, z + s / 2, tex);
 const barrel = (x: number, z: number, y = 0): Box => ({ ...box(x - 0.3, y, z - 0.3, x + 0.3, y + 0.9, z + 0.3, TEX_BARREL), shape: "cyl" });
 const pillar = (x: number, z: number, h = ROOF_Y, s = 0.4): Box => box(x - s / 2, 0, z - s / 2, x + s / 2, h, z + s / 2, TEX_CONCRETE);
+/** Un auto abandonado: carrocería y cabina, a lo largo de X o de Z. */
+function car(out: Box[], x: number, z: number, alongX: boolean, tex = TEX_METAL): void {
+  const L = 4.4;
+  const W = 1.9;
+  const hx = alongX ? L / 2 : W / 2;
+  const hz = alongX ? W / 2 : L / 2;
+  out.push(box(x - hx, 0.25, z - hz, x + hx, 1.2, z + hz, tex));
+  const cx = alongX ? L * 0.25 : W * 0.4;
+  const cz = alongX ? W * 0.4 : L * 0.25;
+  out.push(box(x - cx, 1.2, z - cz, x + cx, 1.75, z + cz, TEX_RUST));
+}
 
 interface Gap {
   from: number;
@@ -106,21 +119,25 @@ function build(): GameMap {
     { id: 3, name: "Calderas", minX: -29, minZ: -24, maxX: -8, maxZ: -9 },
     { id: 4, name: "Taller", minX: 8, minZ: -24, maxX: 29, maxZ: -9 },
     { id: 5, name: "Laboratorio", minX: -7, minZ: -24, maxX: 7, maxZ: -2 },
+    { id: 6, name: "Vestuarios", minX: -44, minZ: -8, maxX: -29.5, maxZ: 18 },
+    { id: 7, name: "Estacionamiento", minX: 29.5, minZ: -8, maxX: 44, maxZ: 18 },
   ];
 
   // ---- Piso: tierra afuera, y cada sala con el suyo (calcomanías sobre la losa).
-  boxes.push(box(-37, -0.5, -32, 37, 0, 26, TEX_DIRT));
-  boxes.push({ ...box(-29.5, 0, -24.5, 29.5, 0.01, 18.5, TEX_FLOOR), decal: true });
+  boxes.push(box(-52, -0.5, -32, 52, 0, 26, TEX_DIRT));
+  boxes.push({ ...box(-44.5, 0, -24.5, 44.5, 0.01, 18.5, TEX_FLOOR), decal: true });
   boxes.push({ ...box(-7, 0, 4, 7, 0.015, 18, TEX_TILES), decal: true });
   boxes.push({ ...box(8, 0, -8, 29, 0.015, 18, TEX_ASPHALT), decal: true });
+  boxes.push({ ...box(29.5, 0, -8, 44, 0.015, 18, TEX_ASPHALT), decal: true });
+  boxes.push({ ...box(-44, 0, -8, -29.5, 0.015, 18, TEX_LAB), decal: true });
   boxes.push({ ...box(-7, 0, -24, 7, 0.015, -2, TEX_LAB), decal: true });
   boxes.push({ ...box(-29, 0, -24, -8, 0.015, -9, TEX_GRATE), decal: true });
 
   // ---- El alambrado del fondo: la franja de tierra termina ahí.
-  boxes.push({ ...box(-37, 0, -32, 37, 2.6, -31.8, TEX_FENCE), thin: true });
-  boxes.push({ ...box(-37, 0, 25.8, 37, 2.6, 26, TEX_FENCE), thin: true });
-  boxes.push({ ...box(-37, 0, -32, -36.8, 2.6, 26, TEX_FENCE), thin: true });
-  boxes.push({ ...box(36.8, 0, -32, 37, 2.6, 26, TEX_FENCE), thin: true });
+  boxes.push({ ...box(-52, 0, -32, 52, 2.6, -31.8, TEX_FENCE), thin: true });
+  boxes.push({ ...box(-52, 0, 25.8, 52, 2.6, 26, TEX_FENCE), thin: true });
+  boxes.push({ ...box(-52, 0, -32, -51.8, 2.6, 26, TEX_FENCE), thin: true });
+  boxes.push({ ...box(51.8, 0, -32, 52, 2.6, 26, TEX_FENCE), thin: true });
 
   // ---- Ventanas con tablas: huecos en el muro de afuera (antepecho a 0,8, dintel a 2,4).
   const barriers: Barrier[] = [];
@@ -158,15 +175,17 @@ function build(): GameMap {
     return { from, to, ...win() };
   };
 
-  // Muro sur (z 18..18.5): ventanas de la oficina (3), del depósito y del patio.
-  wall(boxes, "x", 18, -29.5, 29.5, WALL_H, TEX_BRICK, [
+  // Muro sur (z 18..18.5): ventanas de la oficina (3), del depósito, del patio, de los vestuarios y del estacionamiento.
+  wall(boxes, "x", 18, -44.5, 44.5, WALL_H, TEX_BRICK, [
     windowX(0, 18, -5, -3.4, 1),
     windowX(0, 18, -0.8, 0.8, 1),
     windowX(0, 18, 3.4, 5, 1),
     windowX(1, 18, -22, -20.4, 1),
     windowX(2, 18, 20.4, 22, 1),
+    windowX(6, 18, -38, -36.4, 1),
+    windowX(7, 18, 36.4, 38, 1),
   ]);
-  // Muro norte (z -24.5..-24): calderas (2), laboratorio (1), taller (2).
+  // Muro norte de la parte alta (z -24.5..-24): calderas (2), laboratorio (1), taller (2).
   wall(boxes, "x", -24.5, -29.5, 29.5, WALL_H, TEX_BRICK, [
     windowX(3, -24.5, -24, -22.4, -1),
     windowX(3, -24.5, -14, -12.4, -1),
@@ -174,18 +193,15 @@ function build(): GameMap {
     windowX(4, -24.5, 12.4, 14, -1),
     windowX(4, -24.5, 22.4, 24, -1),
   ]);
-  // Muro oeste (x -29.5..-29): depósito (2), calderas (1).
-  wall(boxes, "z", -29.5, -24.5, 18.5, WALL_H, TEX_BRICK, [
-    windowZ(3, -29.5, -18, -16.4, -1),
-    windowZ(1, -29.5, 2, 3.6, -1),
-    windowZ(1, -29.5, 12, 13.6, -1),
-  ]);
-  // Muro este (x 29..29.5): el patio es a cielo abierto, con portones de reja; el taller, cerrado.
-  wall(boxes, "z", 29, -24.5, 18.5, WALL_H, TEX_BRICK, [
-    windowZ(4, 29, -18, -16.4, 1),
-    windowZ(2, 29, 2, 3.6, 1),
-    windowZ(2, 29, 12, 13.6, 1),
-  ]);
+  // Muro norte de los vestuarios y del estacionamiento (z -8.5..-8), una ventana cada uno.
+  wall(boxes, "x", -8.5, -44.5, -29.5, WALL_H, TEX_BRICK, [windowX(6, -8.5, -38, -36.4, -1)]);
+  wall(boxes, "x", -8.5, 29.5, 44.5, WALL_H, TEX_BRICK, [windowX(7, -8.5, 36.4, 38, -1)]);
+  // Muros oeste y este de la parte alta (calderas y taller, una ventana cada uno).
+  wall(boxes, "z", -29.5, -24.5, -8, WALL_H, TEX_BRICK, [windowZ(3, -29.5, -18, -16.4, -1)]);
+  wall(boxes, "z", 29, -24.5, -8, WALL_H, TEX_BRICK, [windowZ(4, 29, -18, -16.4, 1)]);
+  // Muros oeste y este del todo (vestuarios y estacionamiento), dos ventanas cada uno.
+  wall(boxes, "z", -44.5, -8.5, 18.5, WALL_H, TEX_BRICK, [windowZ(6, -44.5, 0, 1.6, -1), windowZ(6, -44.5, 10, 11.6, -1)]);
+  wall(boxes, "z", 44, -8.5, 18.5, WALL_H, TEX_BRICK, [windowZ(7, 44, 0, 1.6, 1), windowZ(7, 44, 10, 11.6, 1)]);
 
   // ---- Tabiques interiores y puertas.
   const doors: Door[] = [];
@@ -210,21 +226,31 @@ function build(): GameMap {
   doorGap(4, "Puerta del laboratorio", 1250, box(-8, 0, -17, -7, 2.6, -14.8, TEX_METAL), [3, 5]);
   wall(boxes, "z", 7, -24, -2, ROOF_Y, TEX_PLASTER, [{ from: -17, to: -14.8, bottom: 0, top: 2.6 }], 1);
   doorGap(5, "Puerta del laboratorio", 1250, box(7, 0, -17, 8, 2.6, -14.8, TEX_METAL), [4, 5]);
+  // Depósito | Vestuarios (x -29.5..-29) y Patio | Estacionamiento (x 29..29.5): puertas en z 6..8,2.
+  wall(boxes, "z", -29.5, -8, 18, WALL_H, TEX_BRICK, [{ from: 6, to: 8.2, bottom: 0, top: 2.6 }]);
+  doorGap(7, "Puerta de los vestuarios", 1000, box(-29.5, 0, 6, -29, 2.6, 8.2, TEX_WOOD), [1, 6]);
+  // (El portón va en z 1..3,2: más al sur está la plataforma de carga, que taparía el paso.)
+  wall(boxes, "z", 29, -8, 18, WALL_H, TEX_BRICK, [{ from: 1, to: 3.2, bottom: 0, top: 2.6 }]);
+  doorGap(8, "Portón del estacionamiento", 1000, { ...box(29, 0, 1, 29.5, 2.6, 3.2, TEX_FENCE), thin: true }, [2, 7]);
 
-  // ---- Techos: todo menos el patio. El dintel de cada ventana ya llega al techo.
-  boxes.push(box(-29.5, ROOF_Y, 4, 7.5, ROOF_Y + 0.3, 18.5, TEX_ROOF));
-  boxes.push(box(-29.5, ROOF_Y, -8, -7, ROOF_Y + 0.3, 4, TEX_ROOF));
+  // ---- Techos: todo menos el patio y el estacionamiento. El dintel de cada ventana ya llega al techo.
+  boxes.push(box(-44.5, ROOF_Y, 4, 7.5, ROOF_Y + 0.3, 18.5, TEX_ROOF));
+  boxes.push(box(-44.5, ROOF_Y, -8.5, -7, ROOF_Y + 0.3, 4, TEX_ROOF));
   boxes.push(box(-29.5, ROOF_Y, -24.5, 8, ROOF_Y + 0.3, -8, TEX_ROOF));
   boxes.push(box(8, ROOF_Y, -24.5, 29.5, ROOF_Y + 0.3, -9, TEX_ROOF));
-  // Vigas a la vista en el depósito y el taller.
-  for (const z of [-2, 8]) boxes.push(box(-29, ROOF_Y - 0.4, z, -8, ROOF_Y, z + 0.3, TEX_RUST));
+  // Vigas a la vista en el depósito, el taller y los vestuarios.
+  for (const z of [-2, 8]) boxes.push(box(-44, ROOF_Y - 0.4, z, -8, ROOF_Y, z + 0.3, TEX_RUST));
   for (const z of [-20, -14]) boxes.push(box(8, ROOF_Y - 0.4, z, 29, ROOF_Y, z + 0.3, TEX_RUST));
 
-  // ---- Oficina: escritorios, archivero y un mostrador. Se corre alrededor del mostrador.
+  // ---- Oficina: escritorios, archiveros, un sofá y el mostrador. Se corre alrededor del mostrador.
   boxes.push(box(-3.2, 0, 8.5, -1.6, 0.75, 9.3, TEX_WOOD));
   boxes.push(box(1.6, 0, 8.5, 3.2, 0.75, 9.3, TEX_WOOD));
   boxes.push(box(-1.4, 0, 13.6, 1.4, 1.0, 14.4, TEX_WOOD));
   boxes.push(box(-6.8, 0, 4.2, -5.6, 1.6, 5.4, TEX_METAL));
+  boxes.push(box(-6.8, 0, 5.6, -5.6, 1.6, 6.8, TEX_METAL));
+  boxes.push(box(-6.9, 0, 9, -5.6, 0.75, 11.6, TEX_WOOD));
+  boxes.push(box(-6.9, 0.75, 9, -6.5, 1.3, 11.6, TEX_WOOD));
+  boxes.push(box(4.4, 0, 14.2, 6.8, 0.5, 16.8, TEX_SANDBAG));
   boxes.push(crate(-5.4, 16.6, 1.0, 0, TEX_CRATE));
 
   // ---- Depósito: estanterías largas, pallets de cajones, barriles. Pasillos de 2,5 m.
@@ -232,24 +258,30 @@ function build(): GameMap {
     boxes.push(box(x - 0.5, 0, 0, x + 0.5, 2.6, 7, TEX_METAL));
     boxes.push(box(x - 0.5, 0, 10, x + 0.5, 2.6, 15, TEX_METAL));
   }
+  boxes.push(box(-13, 0, -6, -9, 2.6, -5, TEX_METAL));
   boxes.push(crate(-12, 15.5, 1.2));
   boxes.push(crate(-12, 15.5, 1.0, 1.2, TEX_WOOD));
   boxes.push(crate(-13.3, 15.6, 1.1));
   boxes.push(crate(-26.5, -5.5, 1.2));
-  boxes.push(barrel(-11, -6.5));
-  boxes.push(barrel(-11.7, -6.9));
+  boxes.push(crate(-25.3, -5.5, 1.0));
+  boxes.push(barrel(-11, -2.5));
+  boxes.push(barrel(-11.7, -2.9));
   boxes.push(barrel(-27.5, 16.5));
   boxes.push(box(-28.5, 0, 14.5, -25.5, 0.15, 16.5, TEX_WOOD));
   boxes.push(box(-28.5, 0.15, 14.5, -25.5, 2.2, 15.2, TEX_METAL));
+  boxes.push(box(-21, 0, 0.5, -19, 0.9, 1.5, TEX_WOOD));
   boxes.push(pillar(-20, -4));
   boxes.push(pillar(-20, 4));
 
-  // ---- Patio: contenedores, una plataforma de carga con escalón, barriles y sacos.
+  // ---- Patio: contenedores, un camión, una plataforma de carga con escalón, barriles y sacos.
   boxes.push(box(21, 0, -6, 27, 2.6, -3.6, TEX_CONTAINER));
   boxes.push(box(10.5, 0, 0, 13, 2.6, 6, TEX_CONTAINER));
   boxes.push(box(22, 0, 5, 28.5, 0.8, 9.5, TEX_CONCRETE));
   boxes.push(box(22, 0, 9.5, 28.5, 0.4, 10.5, TEX_CONCRETE));
   boxes.push(crate(24, 7.2, 1.0, 0.8, TEX_WOOD));
+  // El camión: la caja y la cabina, estacionado contra el sur.
+  boxes.push(box(16.2, 0.4, 9, 18.6, 2.6, 15, TEX_CONTAINER));
+  boxes.push(box(16.4, 0.4, 15, 18.4, 1.9, 16.6, TEX_METAL));
   boxes.push(barrel(14, 15));
   boxes.push(barrel(14.7, 15.4));
   boxes.push(barrel(14.2, 16.1));
@@ -260,39 +292,66 @@ function build(): GameMap {
   boxes.push(crate(14.2, 3, 1.2, 1.2, TEX_WOOD));
   boxes.push(pillar(19, 4, 3.2, 0.3));
 
-  // ---- Calderas: dos calderas grandes, tubos y la tarima de la llave de la luz.
+  // ---- Calderas: dos calderas grandes (la segunda es el horno), tubos y la tarima de la llave de la luz.
   for (const x of [-25, -12]) boxes.push({ ...box(x - 1.3, 0, -21.3, x + 1.3, 3.6, -18.7, TEX_RUST), shape: "cyl" });
   boxes.push(box(-26.3, 2.8, -22, -10.7, 3.2, -21.6, TEX_RUST));
   boxes.push({ ...box(-19, 0, -14, -17.5, 2.2, -12.5, TEX_RUST), shape: "cyl" });
   boxes.push(box(-21, 0, -23.8, -15, 0.25, -22.4, TEX_METAL));
   boxes.push(barrel(-27, -11));
-  boxes.push(crate(-10, -11, 1.1));
+  boxes.push(barrel(-27.7, -11.5));
+  boxes.push(crate(-23, -11, 1.1));
   // El armario con llave de la primera pieza: lo abren las tres radios.
   doors.push({ id: 6, name: "Armario", price: 0, box: box(-10.6, 0, -13.4, -9.4, 2.2, -12.2, TEX_METAL), zones: [3, 3], locked: true });
 
-  // ---- Taller: mesas de trabajo, un elevador de autos y un auto a medio desarmar.
+  // ---- Taller: mesas de trabajo, un elevador con un auto a medio desarmar, y un cajón de herramientas.
   boxes.push(box(8.5, 0, -23.5, 11.4, 0.9, -22.5, TEX_METAL));
   boxes.push(box(25.2, 0, -23.5, 28.5, 0.9, -22.5, TEX_METAL));
   boxes.push(box(16, 0, -18, 20.4, 0.5, -15.8, TEX_RUST));
   boxes.push(box(16.6, 0.5, -17.6, 19.8, 1.4, -16.2, TEX_CONTAINER));
   boxes.push(crate(27.5, -11, 1.2));
   boxes.push(crate(27.5, -11, 1.0, 1.2, TEX_WOOD));
-  boxes.push(barrel(9.8, -10.5));
-  boxes.push(barrel(10.5, -10.9));
+  boxes.push(box(9, 0, -12, 10.4, 1.1, -10.6, TEX_METAL));
+  boxes.push(barrel(9.8, -14));
+  boxes.push(barrel(10.5, -14.4));
 
   // ---- Laboratorio: mesadas, tanques y la tarima del Pack-a-Punch al fondo.
   boxes.push(box(-5.5, 0, -12, -2.5, 0.9, -5, TEX_LAB));
   boxes.push(box(2.5, 0, -12, 5.5, 0.9, -5, TEX_LAB));
+  boxes.push(box(-1.2, 0, -8, 1.2, 0.9, -4, TEX_LAB));
   for (const x of [-5.5, 5.5]) boxes.push({ ...box(x - 0.7, 0, -20.7, x + 0.7, 2.8, -19.3, TEX_METAL), shape: "cyl" });
   boxes.push(box(-2.5, 0, -23.5, 2.5, 0.3, -19.5, TEX_CONCRETE));
   boxes.push(pillar(-3, -15, ROOF_Y, 0.4));
   boxes.push(pillar(3, -15, ROOF_Y, 0.4));
 
+  // ---- Vestuarios: lockers en fila, bancos, las duchas al fondo y una pileta.
+  boxes.push(box(-43, 0, -7.8, -31, 2.0, -7.2, TEX_METAL));
+  boxes.push(box(-40, 0, 3.5, -32, 2.0, 4.1, TEX_METAL));
+  boxes.push(box(-40, 0, 0.0, -33, 0.45, 0.6, TEX_WOOD));
+  boxes.push(box(-40, 0, 7.5, -33, 0.45, 8.1, TEX_WOOD));
+  boxes.push(box(-44, 0, 12, -40, 2.2, 18, TEX_LAB));
+  boxes.push(box(-34, 0, 15, -31, 2.2, 18, TEX_LAB));
+  boxes.push(box(-40, 0, 10.5, -37, 0.9, 11.5, TEX_LAB));
+  boxes.push(barrel(-30.5, -6.5));
+  boxes.push(crate(-43, 9.5, 1.1));
+  boxes.push(pillar(-37, -2));
+
+  // ---- Estacionamiento: tres autos, un contenedor de basura, cubiertas y tambores.
+  car(boxes, 35, 6.5, false);
+  car(boxes, 38.5, 14, true, TEX_CONTAINER);
+  car(boxes, 41, -3, false, TEX_RUST);
+  boxes.push(box(31, 0, 15.5, 33.2, 1.2, 17.9, TEX_CONTAINER));
+  for (let i = 0; i < 3; i++) boxes.push({ ...box(35.4, i * 0.3, 9.6, 36.6, i * 0.3 + 0.3, 10.8, TEX_RUST), shape: "cyl" });
+  boxes.push(barrel(43, 16.5));
+  boxes.push(barrel(43.5, 15.8));
+  boxes.push(box(30, 0, -3, 31, 0.9, -0.5, TEX_SANDBAG));
+
   // ---- Afuera: algún cajón y barril tirados, para que no sea una explanada pelada.
-  boxes.push(crate(-33, 8, 1.2));
-  boxes.push(barrel(33.5, -12));
+  boxes.push(crate(-48, 8, 1.2));
+  boxes.push(barrel(48.5, -12));
   boxes.push(crate(10, 22.5, 1.1));
   boxes.push(crate(-15, -28.5, 1.2));
+  boxes.push(crate(-36, -14, 1.2));
+  boxes.push(barrel(36, 22));
 
   // ---- Zombis que salen del piso adentro de las salas (no en la oficina).
   spawners.push({ zone: 1, x: -20, y: 0, z: 8.5 }, { zone: 1, x: -12, y: 0, z: -3 });
@@ -300,23 +359,29 @@ function build(): GameMap {
   spawners.push({ zone: 3, x: -22, y: 0, z: -12 });
   spawners.push({ zone: 4, x: 24, y: 0, z: -19 });
   spawners.push({ zone: 5, x: 0, y: 0, z: -9 }, { zone: 5, x: 0, y: 0, z: -16 });
+  spawners.push({ zone: 6, x: -36, y: 0, z: -3 }, { zone: 6, x: -36, y: 0, z: 11 });
+  spawners.push({ zone: 7, x: 36, y: 0, z: 5 }, { zone: 7, x: 40, y: 0, z: 10 });
 
   // ---- Lo que se compra.
   const wallWeapons: WallWeapon[] = [
     { weapon: M14, x: -6.85, y: 1.4, z: 7, yaw: -Math.PI / 2, zone: 0 },
     { weapon: OLYMPIA, x: 6.85, y: 1.4, z: 7, yaw: Math.PI / 2, zone: 0 },
-    { weapon: MP40, x: -28.85, y: 1.4, z: 8.5, yaw: -Math.PI / 2, zone: 1 },
+    { weapon: MP40, x: -28.85, y: 1.4, z: 12, yaw: -Math.PI / 2, zone: 1 },
     { weapon: FRAG, x: -8.15, y: 1.3, z: 2, yaw: Math.PI / 2, zone: 1 },
     { weapon: STAKEOUT, x: 16, y: 1.4, z: 17.85, yaw: 0, zone: 2 },
     { weapon: M16, x: -10.5, y: 1.4, z: -23.85, yaw: Math.PI, zone: 3 },
     { weapon: AK74U, x: 28.85, y: 1.4, z: -13, yaw: Math.PI / 2, zone: 4 },
     { weapon: MP5K, x: 4, y: 1.4, z: -2.15, yaw: 0, zone: 5 },
+    { weapon: PYTHON, x: -43.85, y: 1.4, z: 5.5, yaw: -Math.PI / 2, zone: 6 },
+    { weapon: PM63, x: 43.85, y: 1.4, z: 5.5, yaw: Math.PI / 2, zone: 7 },
   ];
   const boxSpots: Place[] = [
     { x: -20, z: 16.5, yaw: 0, zone: 1 },
     { x: 20, z: 15, yaw: 0, zone: 2 },
     { x: 13, z: -20, yaw: -Math.PI / 2, zone: 4 },
     { x: -15, z: -11, yaw: Math.PI, zone: 3 },
+    { x: -36.5, z: 11, yaw: 0, zone: 6 },
+    { x: 36, z: -1, yaw: 0, zone: 7 },
   ];
   const perks: PerkMachine[] = [
     { perk: PERK_QUICK, x: 5.9, z: 5.2, yaw: Math.PI * 0.75, zone: 0 },
@@ -348,17 +413,19 @@ function build(): GameMap {
     perks,
     pap: { x: 0, z: -21.5, yaw: Math.PI, zone: 5 },
     power: { x: -18, z: -22.9, yaw: Math.PI, zone: 3 },
-    eggParts: [
-      { x: -10, y: 1.1, z: -12.8 },
-      { x: 11.75, y: 2.75, z: 3 },
-    ],
-    bench: { x: 10, z: -21.9, yaw: Math.PI, zone: 4 },
     radios: [
       { x: -27, y: 2.25, z: 14.85, yaw: Math.PI / 2 },
       { x: 24, y: 2.6, z: -4.8, yaw: 0 },
-      { x: -6.4, y: 0.9, z: -11.5, yaw: Math.PI / 2 },
+      { x: -4.5, y: 0.95, z: -11.6, yaw: Math.PI / 2 },
     ],
-    bounds: { minX: -37, minZ: -32, maxX: 37, maxZ: 26 },
+    eggParts: [
+      { x: -10, y: 1.1, z: -12.8, door: 6 },
+      { x: 11.75, y: 2.75, z: 3 },
+      { x: -12, y: 0.9, z: -17.9, souls: true },
+    ],
+    bench: { x: 10, z: -21.9, yaw: Math.PI, zone: 4 },
+    furnace: { x: -12, z: -18.2, yaw: Math.PI, zone: 3 },
+    bounds: { minX: -52, minZ: -32, maxX: 52, maxZ: 26 },
     sky: 0x0b1020,
   };
 }

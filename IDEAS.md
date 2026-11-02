@@ -16,7 +16,9 @@ Lo que hay, lo que quedó en la lista y por qué. Primera versión: 2 de noviemb
 | Bebidas | Seis, con la luz como requisito (menos Quick Revive), tope de cuatro, se pierden al caer | Tests |
 | Caídos | Revivir sosteniendo E, desangrado, Quick Revive solo, fin de partida | Tests |
 | Power-ups | Max Ammo, Insta-Kill, Double Points, Nuke, Carpenter, Fire Sale | Revisado; sin test propio |
-| Easter egg | Tres radios (canción y abren el armario), tres piezas (armario, arriba de un contenedor, la caja), banco de trabajo, Thunder Gun con soplido en cono | 4 tests |
+| Easter egg | Radios con corriente y el diario del ingeniero, armario con llave, bobina arriba del contenedor, horno que junta 15 almas y escupe el gatillo, banco de trabajo, Thunder Gun con soplido en cono | 5 tests |
+| Zombis perdidos | Uno que no se acerca a nadie en 40 s vuelve a la cola (pasó en una partida real: un zombi trabado y la ronda sin terminar) | 1 test |
+| Mapa grande | Vestuarios y Estacionamiento (puertas de 1000 desde el depósito y el patio), más muebles en todas las salas, seis lugares para la caja | Tests del mapa + capturas |
 | Correr | Shift corre hacia adelante (1,32x) con el arma baja; corriendo no se dispara | 1 test |
 | Bebidas | Animación de la botella al tomar; 2,5 s sin disparar | 1 test + captura |
 | Caído con Quick Revive | Se dispara con la pistola; los zombis esperan a distancia; al levantarse salen empujados y hay 2,5 s de gracia | 2 tests |
@@ -28,9 +30,10 @@ Lo que hay, lo que quedó en la lista y por qué. Primera versión: 2 de noviemb
 1. **Probarlo con gente.** Todo lo de arriba se probó solo y con un apuntador automático. Hace
    falta jugarlo de verdad: si los zombis son muy lentos o muy rápidos, si los precios cierran, si
    las rondas altas se ponen imposibles. Los números viven en `constants.ts`.
-2. **El easter egg grande.** Ya hay cadena (radios → armario → piezas → banco → Thunder Gun).
-   Lo que sigue: que armarla abra otra cosa (una trampa, un final), y que las piezas cambien de
-   lugar según la semilla para que no sea siempre igual.
+2. **El easter egg grande.** Ya hay cadena con historia (luz → radios → armario → bobina → almas
+   en el horno → banco → Thunder Gun). Lo que sigue: que armarla abra otra cosa (una trampa, un
+   final con la fábrica estallando), más páginas del diario, y que las piezas cambien de lugar
+   según la semilla para que no sea siempre igual.
 3. **Rondas de perros.** Cada 5 o 6 rondas una de perros rápidos y débiles que aparecen con un
    rayo. El tipo de zombi ya existe (`type`); harían falta otro modelo y otra velocidad.
 4. **Más armas de verdad.** Thundergun, Monkey Bomb, ballestas. El Monkey Bomb es fácil: una

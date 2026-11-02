@@ -1,4 +1,4 @@
-import { ACT_GRENADE, ACT_NONE, FALL_DAMAGE_PER_MS, FALL_SAFE_SPEED, MAX_HP, START_POINTS, TRAIL_LENGTH } from "../constants.js";
+import { ACT_GRENADE, ACT_NONE, EGG_FURNACE, EGG_SONG, EGG_SOULS, FALL_DAMAGE_PER_MS, FALL_SAFE_SPEED, MAX_HP, SOUL_RANGE, START_POINTS, TRAIL_LENGTH } from "../constants.js";
 import type { Box, GameMap } from "../map/types.js";
 import { M1911 } from "../weapons.js";
 import { applySlotAction, damagePlayer, recordTrail, resolveMelee, resolveShot, shotRewind, stepMelee, stepWeaponState, tryThrow } from "./combat.js";
@@ -92,6 +92,7 @@ export function createGameState(): GameState {
     radios: 0,
     songTicks: 0,
     egg: 0,
+    eggSouls: 0,
     reachedRound: 0,
     seed: 1,
     mapIndex: 0,
@@ -153,6 +154,7 @@ export function step(state: GameState, inputs: ReadonlyMap<number, PlayerInput[]
   if (state.phase !== "playing") return;
 
   const boxes = collisionBoxes(state, map);
+  const eventsBefore = events.length;
   for (const p of state.players) {
     if (!p.connected) continue;
     const batch = inputs.get(p.id);
@@ -168,5 +170,27 @@ export function step(state: GameState, inputs: ReadonlyMap<number, PlayerInput[]
 
   for (const p of state.players) if (p.alive) recordTrail(p, state.tick);
 
+  stepSouls(state, map, events, eventsBefore);
   stepRound(state, map, events);
+}
+
+/**
+ * El horno junta almas: cada zombi que alguien mata a menos de SOUL_RANGE de
+ * él cuenta uno (después de las radios). Lleno, escupe el gatillo.
+ */
+function stepSouls(state: GameState, map: GameMap, events: SimEvent[], from: number): void {
+  if ((state.egg & EGG_SONG) === 0 || (state.egg & EGG_FURNACE) !== 0) return;
+  const n = events.length;
+  for (let i = from; i < n; i++) {
+    const e = events[i]!;
+    if (e.t !== "zkill" || e.byId < 0) continue;
+    if (Math.hypot(e.x - map.furnace.x, e.z - map.furnace.z) > SOUL_RANGE) continue;
+    state.eggSouls++;
+    events.push({ t: "egg", byId: e.byId, step: 4, souls: state.eggSouls });
+    if (state.eggSouls >= EGG_SOULS) {
+      state.egg |= EGG_FURNACE;
+      events.push({ t: "egg", byId: e.byId, step: 5 });
+      return;
+    }
+  }
 }

@@ -15,7 +15,6 @@ import {
   TEX_FENCE,
   TEX_METAL,
   TEX_WOOD,
-  BOX_PART_ITEM,
   BOX_POOL,
   weapon,
   weaponStats,
@@ -187,6 +186,8 @@ export class World {
   private radioMeshes: THREE.Group[] = [];
   private partMeshes: THREE.Group[] = [];
   private benchGroup: THREE.Group | null = null;
+  private furnaceMouth: THREE.Mesh | null = null;
+  private furnaceLight: THREE.PointLight | null = null;
   readonly moon: THREE.DirectionalLight;
   private sky: THREE.Mesh | null = null;
   private map: GameMap | null = null;
@@ -307,7 +308,7 @@ export class World {
         }
       }
       // El precio flotando.
-      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(d.locked ? `${d.name} · con llave` : `${d.name} · ${d.price}`, "#ffd27a", 512, 30), transparent: true, depthTest: false }));
+      const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(d.locked ? `${d.name} · con llave` : `${d.name} · ${d.price}`, "#ffd27a", 512, 30), transparent: true, depthTest: true }));
       label.scale.set(2.6, 0.33, 1);
       label.position.set((b.minX + b.maxX) / 2, b.maxY + 0.3, (b.minZ + b.maxZ) / 2);
       g.add(label);
@@ -369,11 +370,11 @@ export class World {
     const slot = new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, 0.12, 0.05), new THREE.MeshStandardMaterial({ color: 0x111111 }));
     slot.position.set(0, h * 0.25, -d / 2 - 0.01);
     g.add(slot);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(label, "#ffffff", 384, 36), transparent: true, depthTest: false }));
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(label, "#ffffff", 384, 36), transparent: true, depthTest: true }));
     sprite.scale.set(1.8, 0.3, 1);
     sprite.position.y = h + 0.35;
     g.add(sprite);
-    const sub2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(sub, "#ffd27a", 384, 30), transparent: true, depthTest: false }));
+    const sub2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(sub, "#ffd27a", 384, 30), transparent: true, depthTest: true }));
     sub2.scale.set(1.5, 0.25, 1);
     sub2.position.y = h + 0.1;
     g.add(sub2);
@@ -436,7 +437,7 @@ export class World {
     const glow = new THREE.PointLight(0x5ab0ff, 1.2, 6, 1.5);
     glow.position.y = 1.2;
     g.add(glow);
-    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(`Caja misteriosa · ${BOX_PRICE}`, "#ffd27a", 512, 30), transparent: true, depthTest: false }));
+    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(`Caja misteriosa · ${BOX_PRICE}`, "#ffd27a", 512, 30), transparent: true, depthTest: true }));
     label.scale.set(2.4, 0.3, 1);
     label.position.y = 1.5;
     g.add(label);
@@ -463,7 +464,7 @@ export class World {
     this.powerLever.geometry.translate(0, 0.2, 0);
     this.powerLever.rotation.x = -0.9;
     g.add(this.powerLever);
-    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture("La luz", "#ffd27a", 256, 34), transparent: true, depthTest: false }));
+    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture("La luz", "#ffd27a", 256, 34), transparent: true, depthTest: true }));
     label.scale.set(1.2, 0.3, 1);
     label.position.y = 2.1;
     g.add(label);
@@ -518,7 +519,7 @@ export class World {
     const tools = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.3), new THREE.MeshStandardMaterial({ color: 0x6b4a2a, roughness: 0.8 }));
     tools.position.set(-0.35, 0.93, 0);
     g.add(tools);
-    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture("Banco de trabajo", "#ffd27a", 384, 32), transparent: true, depthTest: false }));
+    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture("Banco de trabajo", "#ffd27a", 384, 32), transparent: true, depthTest: true }));
     label.scale.set(1.7, 0.28, 1);
     label.position.y = 1.6;
     g.add(label);
@@ -526,18 +527,56 @@ export class World {
     g.rotation.y = b.yaw;
     this.propGroup.add(g);
     this.benchGroup = g;
+    this.buildFurnace(map);
   }
 
   /** Lo que ya se agarró desaparece. */
-  updateEgg(egg: number): void {
-    const bits = [2, 4];
-    this.partMeshes.forEach((g, i) => (g.visible = (egg & (bits[i] ?? 0)) === 0));
+  updateEgg(egg: number, souls = 0): void {
+    const bits = [2, 4, 8];
+    // El gatillo recién aparece cuando el horno se llenó (bit 32).
+    this.partMeshes.forEach((g, i) => (g.visible = (egg & (bits[i] ?? 0)) === 0 && (i !== 2 || (egg & 32) !== 0)));
     const t = performance.now() / 1000;
     for (const g of this.partMeshes) {
       if (!g.visible) continue;
       g.rotation.y = t * 1.2;
       g.position.y = g.userData.baseY + Math.sin(t * 2) * 0.04;
     }
+    // El horno: la boca brilla más cuanto más lleno, y llama cuando ya escupió.
+    if (this.furnaceMouth && this.furnaceLight) {
+      const k = (egg & 32) !== 0 ? 1 : Math.min(1, souls / 15);
+      const flicker = 0.85 + Math.sin(t * 17) * 0.08 + Math.sin(t * 31) * 0.07;
+      (this.furnaceMouth.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.2 + 2.4 * k * flicker;
+      this.furnaceLight.intensity = (0.3 + 3.5 * k) * flicker;
+    }
+  }
+
+  /** La boca del horno: una rejilla que brilla naranja en el frente de la segunda caldera. */
+  private buildFurnace(map: GameMap): void {
+    const f = map.furnace;
+    const g = new THREE.Group();
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 0.12), new THREE.MeshStandardMaterial({ color: 0x331a08, emissive: 0xff6a1a, emissiveIntensity: 0.2, roughness: 0.6 }));
+    mouth.position.set(0, 1.0, 0);
+    g.add(mouth);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.2, 0.08), this.materials[TEX_METAL]);
+    frame.position.set(0, 1.0, 0.06);
+    g.add(frame);
+    for (let i = 0; i < 4; i++) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.9, 0.06), this.materials[TEX_METAL]);
+      bar.position.set(-0.45 + i * 0.3, 1.0, -0.06);
+      g.add(bar);
+    }
+    const light = new THREE.PointLight(0xff7a2a, 0.3, 7, 1.6);
+    light.position.set(0, 1.0, -0.8);
+    g.add(light);
+    const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture("El horno", "#ff9a5a", 256, 34), transparent: true, depthTest: true }));
+    label.scale.set(1.2, 0.3, 1);
+    label.position.y = 2.2;
+    g.add(label);
+    g.position.set(f.x, 0, f.z);
+    g.rotation.y = f.yaw;
+    this.propGroup.add(g);
+    this.furnaceMouth = mouth;
+    this.furnaceLight = light;
   }
 
   private buildLamps(map: GameMap): void {
@@ -652,7 +691,7 @@ export class World {
 
   private showBoxWeapon(wid: number): void {
     if (this.boxWeapon) this.boxGroup!.remove(this.boxWeapon);
-    this.boxWeapon = wid === BOX_PART_ITEM ? buildPart(2, this.puffTex) : buildWeaponMesh(wid, false);
+    this.boxWeapon = buildWeaponMesh(wid, false);
     this.boxWeapon.scale.setScalar(1.3);
     this.boxWeapon.position.set(0, 0.8, 0);
     this.boxWeapon.rotation.z = 0.2;

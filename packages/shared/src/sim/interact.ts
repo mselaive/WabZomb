@@ -8,10 +8,10 @@ import {
   BOX_PRICE,
   BOX_SPIN_TICKS,
   BOX_TAKE_TICKS,
-  BOX_PART_ITEM,
   BOX_TEDDY_FREE_USES,
   DRINK_TICKS,
   EGG_BUILT,
+  EGG_FURNACE,
   EGG_PART_A,
   EGG_PART_B,
   EGG_PART_C,
@@ -19,6 +19,7 @@ import {
   EGG_RADIOS,
   EGG_SONG,
   EGG_SONG_TICKS,
+  EGG_SOULS,
   FRAG_MAX,
   PAP_AMMO_PRICE,
   PAP_PRICE,
@@ -132,12 +133,12 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
   const spot = map.boxSpots[state.box.spot];
   if (spot && near(spot.x, spot.z)) {
     const b = state.box;
-    if (b.phase === 2 && b.forId === p.id) return { kind: "boxTake", id: b.weapon, label: b.weapon === BOX_PART_ITEM ? `Agarrar ${EGG_PART_NAMES[2]}` : `Agarrar ${weapon(b.weapon).name}`, price: 0, ok: true, hold: false };
+    if (b.phase === 2 && b.forId === p.id) return { kind: "boxTake", id: b.weapon, label: `Agarrar ${weapon(b.weapon).name}`, price: 0, ok: true, hold: false };
     if (b.phase === 0) {
       const price = boxPrice(state);
       return { kind: "box", id: 0, label: "Caja misteriosa", price, ok: p.points >= price, why: p.points < price ? "No te alcanza" : undefined, hold: false };
     }
-    if (b.phase === 2) return { kind: "box", id: 0, label: `${b.weapon === BOX_PART_ITEM ? "Una pieza" : weapon(b.weapon).name} (de otro)`, price: 0, ok: false, why: "Esperá que la agarre", hold: false };
+    if (b.phase === 2) return { kind: "box", id: 0, label: `${weapon(b.weapon).name} (de otro)`, price: 0, ok: false, why: "Esperá que la agarre", hold: false };
     return { kind: "box", id: 0, label: "Caja misteriosa", price: 0, ok: false, why: b.phase === 3 ? "El osito se la lleva" : "Girando...", hold: false };
   }
 
@@ -188,11 +189,19 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
   }
 
   // Las piezas de la Thunder Gun que están en el mapa, y el banco donde se arma.
-  const partBits = [EGG_PART_A, EGG_PART_B];
+  const partBits = [EGG_PART_A, EGG_PART_B, EGG_PART_C];
   for (let i = 0; i < map.eggParts.length && i < partBits.length; i++) {
     const part = map.eggParts[i]!;
     if ((state.egg & partBits[i]!) !== 0 || !near(part.x, part.z, 2.0) || Math.abs(part.y - (p.y + 1.2)) > 2.2) continue;
+    // Adentro de un armario cerrado no se agarra nada; el horno sólo la entrega cuando se llenó.
+    if (part.door !== undefined && (state.doorsOpen & (1 << part.door)) === 0) continue;
+    if (part.souls && (state.egg & EGG_FURNACE) === 0) continue;
     return { kind: "part", id: i, label: `Agarrar ${EGG_PART_NAMES[i]}`, price: 0, ok: true, hold: false };
+  }
+  // El horno: el cartel de cuántas almas lleva (se alimenta matando al lado, no con E).
+  if (near(map.furnace.x, map.furnace.z, USE_RANGE + 0.6) && (state.egg & EGG_FURNACE) === 0) {
+    if ((state.egg & EGG_SONG) === 0) return { kind: "bench", id: 1, label: "El horno", price: 0, ok: false, why: "Frío. Primero las radios", hold: false };
+    return { kind: "bench", id: 1, label: "El horno", price: 0, ok: false, why: `Almas: ${state.eggSouls} de ${EGG_SOULS}. Matá zombis acá al lado`, hold: false };
   }
   if (near(map.bench.x, map.bench.z, USE_RANGE + 0.4)) {
     const parts = (state.egg & EGG_PART_A ? 1 : 0) + (state.egg & EGG_PART_B ? 1 : 0) + (state.egg & EGG_PART_C ? 1 : 0);
@@ -216,6 +225,7 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
   for (let i = 0; i < map.radios.length; i++) {
     const r = map.radios[i]!;
     if ((state.radios & (1 << i)) !== 0 || !near(r.x, r.z, 1.8) || Math.abs(r.y - (p.y + 1.2)) > 1.6) continue;
+    if (!state.power) return { kind: "radio", id: i, label: "Una radio vieja", price: 0, ok: false, why: "Sin corriente: primero la luz", hold: false };
     return { kind: "radio", id: i, label: "Una radio vieja", price: 0, ok: true, hold: false };
   }
 
@@ -307,13 +317,14 @@ export function stepUse(state: GameState, p: PlayerState, input: PlayerInput, ma
       return;
     }
     case "part": {
-      const bit = it.id === 0 ? EGG_PART_A : EGG_PART_B;
+      const bit = it.id === 0 ? EGG_PART_A : it.id === 1 ? EGG_PART_B : EGG_PART_C;
       if ((state.egg & bit) !== 0) return;
       state.egg |= bit;
       events.push({ t: "egg", byId: p.id, step: it.id });
       return;
     }
     case "bench": {
+      if (it.id === 1) return;
       if ((state.egg & EGG_BUILT) === 0) {
         state.egg |= EGG_BUILT;
         events.push({ t: "egg", byId: p.id, step: 3 });
@@ -362,10 +373,7 @@ export function stepUse(state: GameState, p: PlayerState, input: PlayerInput, ma
     case "boxTake": {
       const b = state.box;
       if (b.phase !== 2 || b.forId !== p.id) return;
-      if (b.weapon === BOX_PART_ITEM) {
-        state.egg |= EGG_PART_C;
-        events.push({ t: "egg", byId: p.id, step: 2 });
-      } else giveWeapon(p, b.weapon);
+      giveWeapon(p, b.weapon);
       events.push({ t: "box", what: "take", byId: p.id, weapon: b.weapon, spot: b.spot });
       b.phase = 0;
       b.ticksLeft = 0;
@@ -408,7 +416,8 @@ export function stepMachines(state: GameState, map: GameMap, events: SimEvent[])
   const rng = state.rng ?? Math.random;
   const b = state.box;
   if (b.phase === 1 && --b.ticksLeft <= 0) {
-    const teddyChance = b.uses <= BOX_TEDDY_FREE_USES ? 0 : Math.min(0.5, 0.12 * (b.uses - BOX_TEDDY_FREE_USES));
+    // Poco frecuente: después de las vueltas gratis, 10 % y sube 5 % por vuelta hasta 35 %.
+    const teddyChance = b.uses <= BOX_TEDDY_FREE_USES ? 0 : Math.min(0.35, 0.1 + 0.05 * (b.uses - BOX_TEDDY_FREE_USES - 1));
     const buyer = state.players.find((q) => q.id === b.forId);
     if (rng() < teddyChance && map.boxSpots.length > 1) {
       b.phase = 3;
@@ -417,9 +426,7 @@ export function stepMachines(state: GameState, map: GameMap, events: SimEvent[])
       events.push({ t: "box", what: "teddy", byId: b.forId, weapon: -1, spot: b.spot });
     } else {
       const owned: number[] = buyer ? buyer.slots.filter((w) => w >= 0) : [];
-      // Con las otras dos piezas en mano, la caja entrega la tercera.
-      const wantsPart = (state.egg & EGG_PART_A) !== 0 && (state.egg & EGG_PART_B) !== 0 && (state.egg & EGG_PART_C) === 0;
-      b.weapon = wantsPart ? BOX_PART_ITEM : rollBox(rng, owned);
+      b.weapon = rollBox(rng, owned);
       b.phase = 2;
       b.ticksLeft = BOX_TAKE_TICKS;
       events.push({ t: "box", what: "offer", byId: b.forId, weapon: b.weapon, spot: b.spot });

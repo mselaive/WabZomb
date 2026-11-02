@@ -1,4 +1,5 @@
 import {
+  EGG_SOULS,
   JUGG_HP,
   MAPS,
   PERK_COLORS,
@@ -460,12 +461,18 @@ export class UI {
   }
 
   /** Los efectos activos: Insta-Kill, Double Points, Fire Sale (ticks que quedan). */
-  setEffects(insta: number, double: number, fire: number): void {
-    const key = `${insta > 0 ? 1 : 0}${double > 0 ? 1 : 0}${fire > 0 ? 1 : 0}${insta < 100 && insta > 0 ? "a" : ""}${double < 100 && double > 0 ? "b" : ""}${fire < 100 && fire > 0 ? "c" : ""}`;
+  setEffects(insta: number, double: number, fire: number, souls = -1): void {
+    const key = `${insta > 0 ? 1 : 0}${double > 0 ? 1 : 0}${fire > 0 ? 1 : 0}${insta < 100 && insta > 0 ? "a" : ""}${double < 100 && double > 0 ? "b" : ""}${fire < 100 && fire > 0 ? "c" : ""}|${souls}`;
     if (key === this.lastFx) return;
     this.lastFx = key;
     const el = $("fxBar");
     el.replaceChildren();
+    if (souls >= 0) {
+      const s = document.createElement("span");
+      s.className = "fx souls";
+      s.textContent = `Almas ${souls}/${EGG_SOULS}`;
+      el.append(s);
+    }
     const add = (kind: number, ticks: number) => {
       if (ticks <= 0) return;
       const s = document.createElement("span");

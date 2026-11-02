@@ -118,10 +118,11 @@ export interface GameMap {
   power: Place;
   /** Las radios escondidas del easter egg. */
   radios: { x: number; y: number; z: number; yaw: number }[];
-  /** Las piezas de la Thunder Gun que están en el mapa (la A en el armario, la B arriba de algo); la C la da la caja. */
-  eggParts: { x: number; y: number; z: number }[];
-  /** El banco donde se arma. */
+  /** Las piezas de la Thunder Gun: la A en el armario (`door` tiene que estar abierta), la B arriba de algo, la C la escupe el horno (`souls`). */
+  eggParts: { x: number; y: number; z: number; door?: number; souls?: boolean }[];
+  /** El banco donde se arma, y el horno que junta almas. */
   bench: Place;
+  furnace: Place;
   bounds: { minX: number; minZ: number; maxX: number; maxZ: number };
   sky: number;
 }

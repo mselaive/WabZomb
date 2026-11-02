@@ -173,8 +173,9 @@ export interface SnapshotMsg {
   /** Ticks que quedan de Insta-Kill, Double Points, Fire Sale y la canción. */
   fx: [number, number, number, number];
   radios: number;
-  /** El easter egg (bits EGG_*). */
+  /** El easter egg (bits EGG_*) y las almas del horno. */
   egg: number;
+  souls: number;
   st: SnapStanding[];
   /** A qué ronda llegaron (cuando terminó). */
   reached: number;

@@ -43,7 +43,7 @@ export function hasPerk(p: { perks: number }, perk: number): boolean {
 
 /** Corriendo: Shift y hacia adelante, de pie, sin la mira puesta. Corriendo no se dispara. */
 export function isSprinting(p: PlayerState, input: PlayerInput): boolean {
-  return input.sprint && input.fwd > 0 && p.crouch === 0 && !p.scoped && !p.down && p.alive;
+  return input.sprint && input.fwd > 0 && p.crouch === 0 && !p.scoped && !p.down && p.alive && p.drinkTicks === 0;
 }
 
 /** Velocidad máxima en el piso con lo que lleva en la mano y la postura. */
