@@ -248,9 +248,8 @@ function build(): GameMap {
   boxes.push(box(-1.4, 0, 13.6, 1.4, 1.0, 14.4, TEX_WOOD));
   boxes.push(box(-6.8, 0, 4.2, -5.6, 1.6, 5.4, TEX_METAL));
   boxes.push(box(-6.8, 0, 5.6, -5.6, 1.6, 6.8, TEX_METAL));
-  boxes.push(box(-6.9, 0, 9, -5.6, 0.75, 11.6, TEX_WOOD));
-  boxes.push(box(-6.9, 0.75, 9, -6.5, 1.3, 11.6, TEX_WOOD));
-  boxes.push(box(4.4, 0, 14.2, 6.8, 0.5, 16.8, TEX_SANDBAG));
+  boxes.push(box(-6.9, 0, 13, -5.6, 0.75, 15.6, TEX_WOOD));
+  boxes.push(box(-6.9, 0.75, 13, -6.5, 1.3, 15.6, TEX_WOOD));
   boxes.push(crate(-5.4, 16.6, 1.0, 0, TEX_CRATE));
 
   // ---- Depósito: estanterías largas, pallets de cajones, barriles. Pasillos de 2,5 m.
