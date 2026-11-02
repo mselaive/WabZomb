@@ -29,7 +29,7 @@ Los puertos son distintos de los de WabCS (5173 y 8787) para poder tener los dos
 
 | Tecla | Acción |
 |---|---|
-| `WASD` | moverse · `Shift` correr (hacia adelante; corriendo no se dispara) · `Ctrl` / `C` agacharse · `Espacio` saltar |
+| `WASD` | moverse · `Shift` correr (hacia adelante; corriendo no se dispara, y tomando una bebida no se corre) · `Ctrl` / `C` agacharse · `Espacio` saltar |
 | Mouse | mirar (el primer click captura el puntero; `Esc` abre la pausa) |
 | Click izquierdo | disparar · click derecho: la mira (los que tienen) |
 | `R` | recargar · `1` `2` `3` cambiar de arma · `Q` la última arma · `F` mirar el arma |
