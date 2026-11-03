@@ -1,3 +1,4 @@
+import { EGG_ESCAPED } from "../constants.js";
 import {
   BOARD_MAX,
   ENDED_TICKS,
@@ -99,6 +100,7 @@ export function startMatch(state: GameState, seed: number, map: GameMap, events:
   state.songTicks = 0;
   state.egg = 0;
   state.eggSouls = 0;
+  state.eggTicks = 0;
   state.reachedRound = 0;
   // La caja arranca en cualquiera de sus lugares: en cada partida hay que salir a buscarla.
   state.box.spot = Math.floor((state.rng ?? Math.random)() * Math.max(1, map.boxSpots.length));
@@ -130,10 +132,10 @@ export function stepRound(state: GameState, map: GameMap, events: SimEvent[]): v
   const r = state.round;
   const people = connected(state);
 
-  // ¿Se terminó? Nadie de pie, y nadie que se vaya a levantar solo.
+  // ¿Se terminó? Nadie de pie, y nadie que se vaya a levantar solo. O escaparon.
   const standing = people.filter((p) => p.alive && !p.down);
   const selfReviving = people.some((p) => p.alive && p.down && p.selfRevive);
-  if (people.length > 0 && standing.length === 0 && !selfReviving) {
+  if ((state.egg & EGG_ESCAPED) !== 0 || (people.length > 0 && standing.length === 0 && !selfReviving)) {
     state.phase = "ended";
     state.phaseTicksLeft = ENDED_TICKS;
     state.reachedRound = r.number;

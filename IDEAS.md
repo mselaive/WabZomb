@@ -24,8 +24,16 @@ Lo que hay, lo que quedó en la lista y por qué. Primera versión: 2 de noviemb
 | Caído con Quick Revive | Se dispara con la pistola; los zombis esperan a distancia; al levantarse salen empujados y hay 2,5 s de gracia | 2 tests |
 | Gráficos | Mapa de noche con luna y estrellas, lámparas que cambian al prender la luz, tiza en las paredes, máquinas, tablas, zombis de cajas con ojos que brillan | Capturas |
 | Sonido | Generado por código: tiros por clase, gruñidos, tablas, máquinas, rondas, la canción | **No lo escuché**: el navegador de prueba no tiene salida |
+| La Roca | Prisión de 14 zonas y 3 alturas sobre los planos públicos de Alcatraz, zombis que salen de celdas tapiadas | 35 tests (uno recorre el mapa caminando con la física real), un bot con el servidor real y capturas; **sin jugarla a mano con mouse** |
+| Más armas | Trabuco giratorio (diseño propio de un trabuco de seis caños), Thompson, BAR, Winchester 1897, Luger, Garand, Springfield, PPSh; 34 en total, con el haz del trabuco girando en cada tiro | 3 tests + capturas; **sin probar la sensación a mano** |
+| La fuga | Easter egg propio de La Roca: llave, cuatro piezas, lancha, faro, asedio de 2 minutos y final con victoria | 5 tests, uno de punta a punta en la simulación; **sin jugarla entera a mano** |
+| Producción de La Roca | PBR de Poly Haven (CC0), luz horneada apagada y prendida, celdas instanciadas, mar, bahía, faro, lluvia, relámpagos, ambiente de sonido | Capturas; el sonido nuevo **tampoco lo escuché** |
 
 ## Lo que falta, en orden
+
+0. **Las armas siguen armadas con piezas simples** (ya biseladas y gastadas). Al lado de La Roca es lo que más se nota. Lo que sigue en
+   producción: modelos de armas mejores, y la animación de manos. Después, medir el rendimiento en
+   máquinas más flojas: el mapa dibuja unos 470.000 triángulos y 350 llamadas por cuadro.
 
 1. **Probarlo con gente.** Todo lo de arriba se probó solo y con un apuntador automático. Hace
    falta jugarlo de verdad: si los zombis son muy lentos o muy rápidos, si los precios cierran, si

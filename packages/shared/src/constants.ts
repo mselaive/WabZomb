@@ -18,7 +18,7 @@ export const LAG_COMP_MAX_TICKS = 8;
 export const TRAIL_LENGTH = 16;
 
 /** Sube cuando el cliente y el servidor dejan de entenderse (ver el README). */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /** Se puede jugar solo. Cuatro, como en el original. */
 export const MIN_PLAYERS = 1;
@@ -308,6 +308,24 @@ export const EGG_STEP_NOTES = [
   "El horno escupió el gatillo. Con las tres piezas, al banco de trabajo del taller.",
   "Lo que la fábrica estaba haciendo cuando pasó lo que pasó. Dos tiros por cargador: cuidado.",
 ] as const;
+/**
+ * La fuga, el easter egg largo de La Roca, después de armar la Thunder Gun: la
+ * llave del alcaide; las cuatro piezas de la lancha; arreglarla; prender el faro
+ * y aguantar el asedio hasta que se abra la niebla; y subir a la lancha.
+ */
+export const EGG_KEY = 64;
+export const EGG_BOAT_PARTS = [128, 256, 512, 1024] as const;
+export const EGG_BOAT = 2048;
+export const EGG_BEACON = 4096;
+export const EGG_READY = 8192;
+export const EGG_ESCAPED = 16384;
+/** Cuánto hay que aguantar con el faro prendido. */
+export const ESCAPE_SIEGE_TICKS = 120 * TICK_RATE;
+/** Durante el asedio salen más seguido (factor sobre el intervalo de la ronda). */
+export const SIEGE_SPAWN_FACTOR = 0.45;
+/** Para subir a la lancha, todos los que estén de pie tienen que estar a esta distancia. */
+export const BOARD_RADIUS = 14;
+
 /** La Thunder Gun: hasta dónde llega el soplido y qué tan ancho (coseno del medio ángulo). */
 export const THUNDER_RANGE = 9;
 export const THUNDER_COS = 0.82;

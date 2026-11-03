@@ -176,6 +176,8 @@ export interface SnapshotMsg {
   /** El easter egg (bits EGG_*) y las almas del horno. */
   egg: number;
   souls: number;
+  /** Lo que queda del asedio de la fuga, en ticks. */
+  siege: number;
   st: SnapStanding[];
   /** A qué ronda llegaron (cuando terminó). */
   reached: number;

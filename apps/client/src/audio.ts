@@ -65,6 +65,7 @@ export class Audio {
   }
 
   private noise(duration: number, filterHz: number, gain: number, pan: number, type: BiquadFilterType = "lowpass", q = 1): void {
+    if (!this.ctx) return;
     const ctx = this.ctx!;
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuffer;
@@ -83,6 +84,7 @@ export class Audio {
   }
 
   private tone(freq: number, duration: number, gain: number, pan: number, type: OscillatorType = "sine", slideTo?: number, delay = 0): void {
+    if (!this.ctx) return;
     const ctx = this.ctx!;
     const t0 = ctx.currentTime + delay;
     const o = ctx.createOscillator();
@@ -305,6 +307,135 @@ export class Audio {
   // ------------------------------------------------------------ máquinas y avisos
 
   /** Compra: el "ca-ching". */
+  // ------------------------------------------------------------ el clima de la isla
+
+  private ambienceOn = false;
+  private rainGain: GainNode | null = null;
+  private windGain: GainNode | null = null;
+  private roomGain: GainNode | null = null;
+  private ambienceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Un ruido que no termina nunca, con su filtro. */
+  private loopNoise(filterHz: number, type: BiquadFilterType, q = 0.8): GainNode | null {
+    if (!this.ctx || !this.master || !this.noiseBuffer) return null;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noiseBuffer;
+    src.loop = true;
+    const f = this.ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = filterHz;
+    f.Q.value = q;
+    const g = this.ctx.createGain();
+    g.gain.value = 0;
+    src.connect(f).connect(g).connect(this.master);
+    src.start();
+    return g;
+  }
+
+  /** Viento, lluvia, el zumbido del edificio, y de vez en cuando algo a lo lejos. Afuera cambia todo. */
+  setAmbience(outdoor: boolean): void {
+    if (!this.ctx) return;
+    if (!this.ambienceOn) {
+      this.ambienceOn = true;
+      this.windGain = this.loopNoise(240, "lowpass");
+      this.rainGain = this.loopNoise(5200, "highpass", 0.4);
+      this.roomGain = this.loopNoise(90, "lowpass", 2);
+      this.scheduleAmbient();
+    }
+    const now = this.ctx.currentTime;
+    this.windGain?.gain.setTargetAtTime(outdoor ? 0.14 : 0.035, now, 0.6);
+    this.rainGain?.gain.setTargetAtTime(outdoor ? 0.05 : 0.004, now, 0.5);
+    this.roomGain?.gain.setTargetAtTime(outdoor ? 0.03 : 0.11, now, 0.8);
+  }
+
+  stopAmbience(): void {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    this.windGain?.gain.setTargetAtTime(0, now, 0.3);
+    this.rainGain?.gain.setTargetAtTime(0, now, 0.3);
+    this.roomGain?.gain.setTargetAtTime(0, now, 0.3);
+    if (this.ambienceTimer) clearTimeout(this.ambienceTimer);
+    this.ambienceTimer = null;
+    this.ambienceOn = false;
+    this.windGain = this.rainGain = this.roomGain = null;
+  }
+
+  private scheduleAmbient(): void {
+    this.ambienceTimer = setTimeout(() => {
+      if (!this.ambienceOn) return;
+      const r = Math.random();
+      if (r < 0.38) this.creak();
+      else if (r < 0.7) this.drip();
+      else if (r < 0.88) this.foghorn();
+      else this.distantSlam();
+      this.scheduleAmbient();
+    }, 6000 + Math.random() * 16000);
+  }
+
+  /** Un fierro que se dobla: un tono que resbala, con ruido. */
+  private creak(): void {
+    const pan = Math.random() * 1.4 - 0.7;
+    const base = 190 + Math.random() * 140;
+    for (let i = 0; i < 4; i++) this.tone(base + Math.random() * 40, 0.16, 0.012, pan, "sawtooth", base * 0.82, i * 0.11);
+    this.noise(0.5, 900, 0.012, pan, "bandpass", 5);
+  }
+
+  private drip(): void {
+    const pan = Math.random() * 1.6 - 0.8;
+    const f = 900 + Math.random() * 700;
+    this.tone(f, 0.08, 0.03, pan, "sine", f * 1.8);
+    this.tone(f * 0.7, 0.14, 0.012, pan, "sine", f * 1.2, 0.13);
+  }
+
+  /** La sirena de niebla de la bahía: muy grave y muy lejos. */
+  private foghorn(): void {
+    this.tone(82, 3.2, 0.06, -0.2, "sawtooth", 78);
+    this.tone(123, 3.2, 0.025, -0.2, "sine", 120);
+    this.tone(82, 2.4, 0.04, -0.2, "sawtooth", 76, 4.2);
+  }
+
+  /** Una reja que se cierra en otra parte del edificio. */
+  private distantSlam(): void {
+    const pan = Math.random() * 1.2 - 0.6;
+    this.noise(0.35, 500, 0.06, pan);
+    this.tone(70, 0.5, 0.05, pan, "sine", 45);
+    this.tone(310, 0.5, 0.008, pan, "square", 290, 0.02);
+  }
+
+  /** El trueno que sigue al relámpago, con unos segundos de retardo. */
+  thunder(delay: number): void {
+    if (!this.ctx) return;
+    setTimeout(() => {
+      this.noise(2.8, 150, 0.3, 0, "lowpass");
+      this.noise(0.5, 600, 0.09, 0, "lowpass");
+      this.tone(45, 2.2, 0.14, 0, "sine", 28);
+    }, delay * 1000);
+  }
+
+  /** La sirena de la isla: sube y baja dos veces. Suena cuando empieza el asedio. */
+  siren(): void {
+    for (let i = 0; i < 2; i++) {
+      this.tone(240, 1.7, 0.09, 0, "sawtooth", 680, i * 3.2);
+      this.tone(680, 1.5, 0.09, 0, "sawtooth", 240, 1.7 + i * 3.2);
+    }
+  }
+
+  /** La bocina de la lancha, cuando se abre la niebla. */
+  boatHorn(): void {
+    this.tone(146, 1.6, 0.14, 0, "sawtooth", 142);
+    this.tone(220, 1.6, 0.08, 0, "square", 216);
+    this.tone(146, 2.2, 0.14, 0, "sawtooth", 140, 2);
+    this.tone(220, 2.2, 0.08, 0, "square", 214, 2);
+  }
+
+  /** El chicharrón de la cerradura eléctrica, cuando se abre una reja. */
+  buzzer(x: number, z: number): void {
+    const { gain, pan } = this.spatial(x, z, 12);
+    this.tone(118, 0.7, 0.05 * gain, pan, "square", 118);
+    this.tone(236, 0.7, 0.02 * gain, pan, "sawtooth", 236);
+    this.noise(0.25, 800, 0.1 * gain, pan, "lowpass");
+  }
+
   buy(): void {
     if (!this.ctx) return;
     this.tone(1200, 0.08, 0.2, 0, "triangle");

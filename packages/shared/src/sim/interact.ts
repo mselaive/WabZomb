@@ -9,6 +9,14 @@ import {
   BOX_SPIN_TICKS,
   BOX_TAKE_TICKS,
   BOX_TEDDY_FREE_USES,
+  BOARD_RADIUS,
+  EGG_BEACON,
+  EGG_BOAT,
+  EGG_BOAT_PARTS,
+  EGG_ESCAPED,
+  EGG_KEY,
+  EGG_READY,
+  ESCAPE_SIEGE_TICKS,
   DRINK_TICKS,
   EGG_BUILT,
   EGG_FURNACE,
@@ -44,7 +52,7 @@ import { applyPerk, givePoints, revivePlayer, slotLimit, switchTo } from "./comb
 import { hasPerk } from "./movement.js";
 import type { GameState, PlayerInput, PlayerState, SimEvent } from "./types.js";
 
-export type InteractionKind = "revive" | "boxTake" | "papTake" | "box" | "pap" | "perk" | "wall" | "ammo" | "grenades" | "door" | "power" | "radio" | "part" | "bench" | "barrier";
+export type InteractionKind = "revive" | "boxTake" | "papTake" | "box" | "pap" | "perk" | "wall" | "ammo" | "grenades" | "door" | "power" | "radio" | "part" | "bench" | "barrier" | "quest";
 
 /** Lo que haría E ahora: para el servidor (aplicarlo) y para el HUD (el cartel). */
 export interface Interaction {
@@ -58,6 +66,11 @@ export interface Interaction {
   why?: string;
   /** Se sostiene (revivir, reparar) o se aprieta. */
   hold: boolean;
+}
+
+/** ¿La altura de un cuerpo parado en `y` alcanza esta caja? */
+function atHeightOf(b: Box, y: number): boolean {
+  return y + 1.8 > b.minY - 0.5 && y < b.maxY + 0.5;
 }
 
 /** Distancia en el plano de un punto a una caja (0 si está adentro). */
@@ -117,21 +130,21 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
   if (!p.alive) return null;
   const x = p.x;
   const z = p.z;
-  const near = (px: number, pz: number, range = USE_RANGE) => Math.hypot(px - x, pz - z) <= range;
+  const near = (px: number, pz: number, range = USE_RANGE, py = 0) => Math.hypot(px - x, pz - z) <= range && Math.abs(py - p.y) < 2.2;
   const humans = state.players.filter((q) => q.connected).length;
 
   // Un compañero caído: lo primero.
   if (!p.down) {
     for (const q of state.players) {
       if (q === p || !q.connected || !q.alive || !q.down || q.selfRevive) continue;
-      if (near(q.x, q.z, REVIVE_RANGE)) return { kind: "revive", id: q.id, label: "Revivir", price: 0, ok: true, hold: true };
+      if (near(q.x, q.z, REVIVE_RANGE, q.y)) return { kind: "revive", id: q.id, label: "Revivir", price: 0, ok: true, hold: true };
     }
   }
   if (p.down) return null;
 
   // La caja con un arma esperando (para el que pagó).
   const spot = map.boxSpots[state.box.spot];
-  if (spot && near(spot.x, spot.z)) {
+  if (spot && near(spot.x, spot.z, USE_RANGE, spot.y ?? 0)) {
     const b = state.box;
     if (b.phase === 2 && b.forId === p.id) return { kind: "boxTake", id: b.weapon, label: `Agarrar ${weapon(b.weapon).name}`, price: 0, ok: true, hold: false };
     if (b.phase === 0) {
@@ -143,7 +156,7 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
   }
 
   // El Pack-a-Punch.
-  if (near(map.pap.x, map.pap.z, USE_RANGE + 0.6)) {
+  if (near(map.pap.x, map.pap.z, USE_RANGE + 0.6, map.pap.y ?? 0)) {
     const pp = state.pap;
     if (pp.phase === 2 && pp.forId === p.id) return { kind: "papTake", id: pp.weapon, label: `Agarrar ${weaponStats(pp.weapon, true).name}`, price: 0, ok: true, hold: false };
     if (pp.phase !== 0) return { kind: "pap", id: 0, label: "Pack-a-Punch", price: 0, ok: false, why: pp.phase === 2 ? "Hay un arma esperando a otro" : "Trabajando...", hold: false };
@@ -156,7 +169,7 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
 
   // Las bebidas.
   for (const m of map.perks) {
-    if (!near(m.x, m.z, USE_RANGE + 0.4)) continue;
+    if (!near(m.x, m.z, USE_RANGE + 0.4, m.y ?? 0)) continue;
     const price = perkPrice(state, m.perk);
     const name = PERK_NAMES[m.perk] ?? "Bebida";
     if (hasPerk(p, m.perk)) return { kind: "perk", id: m.perk, label: name, price, ok: false, why: "Ya la tenés", hold: false };
@@ -171,7 +184,7 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
   // Las armas de la pared.
   for (let i = 0; i < map.wallWeapons.length; i++) {
     const ww = map.wallWeapons[i]!;
-    if (!near(ww.x, ww.z)) continue;
+    if (!near(ww.x, ww.z, USE_RANGE, ww.y - 1.4)) continue;
     const w = weapon(ww.weapon);
     if (ww.weapon === FRAG) {
       const price = 250;
@@ -192,51 +205,112 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
   const partBits = [EGG_PART_A, EGG_PART_B, EGG_PART_C];
   for (let i = 0; i < map.eggParts.length && i < partBits.length; i++) {
     const part = map.eggParts[i]!;
-    if ((state.egg & partBits[i]!) !== 0 || !near(part.x, part.z, 2.0) || Math.abs(part.y - (p.y + 1.2)) > 2.2) continue;
+    if ((state.egg & partBits[i]!) !== 0 || !near(part.x, part.z, 2.0, p.y) || Math.abs(part.y - (p.y + 1.2)) > 2.2) continue;
     // Adentro de un armario cerrado no se agarra nada; el horno sólo la entrega cuando se llenó.
     if (part.door !== undefined && (state.doorsOpen & (1 << part.door)) === 0) continue;
     if (part.souls && (state.egg & EGG_FURNACE) === 0) continue;
     return { kind: "part", id: i, label: `Agarrar ${EGG_PART_NAMES[i]}`, price: 0, ok: true, hold: false };
   }
   // El horno: el cartel de cuántas almas lleva (se alimenta matando al lado, no con E).
-  if (near(map.furnace.x, map.furnace.z, USE_RANGE + 0.6) && (state.egg & EGG_FURNACE) === 0) {
+  if (near(map.furnace.x, map.furnace.z, USE_RANGE + 0.6, map.furnace.y ?? 0) && (state.egg & EGG_FURNACE) === 0) {
     if ((state.egg & EGG_SONG) === 0) return { kind: "bench", id: 1, label: "El horno", price: 0, ok: false, why: "Frío. Primero las radios", hold: false };
     return { kind: "bench", id: 1, label: "El horno", price: 0, ok: false, why: `Almas: ${state.eggSouls} de ${EGG_SOULS}. Matá zombis acá al lado`, hold: false };
   }
-  if (near(map.bench.x, map.bench.z, USE_RANGE + 0.4)) {
+  if (near(map.bench.x, map.bench.z, USE_RANGE + 0.4, map.bench.y ?? 0)) {
     const parts = (state.egg & EGG_PART_A ? 1 : 0) + (state.egg & EGG_PART_B ? 1 : 0) + (state.egg & EGG_PART_C ? 1 : 0);
     if ((state.egg & EGG_BUILT) !== 0) return { kind: "bench", id: 0, label: "Thunder Gun", price: 0, ok: hasWeapon(p, THUNDERGUN) < 0, why: hasWeapon(p, THUNDERGUN) >= 0 ? "Ya la tenés" : undefined, hold: false };
     if (parts === 3) return { kind: "bench", id: 0, label: "Armar la Thunder Gun", price: 0, ok: true, hold: false };
     return { kind: "bench", id: 0, label: "Banco de trabajo", price: 0, ok: false, why: `Faltan piezas (${parts} de 3)`, hold: false };
   }
 
+  // La fuga.
+  const fuga = findQuest(state, p, map, near);
+  if (fuga) return fuga;
+
   // Las puertas.
   for (const d of map.doors) {
     if ((state.doorsOpen & (1 << d.id)) !== 0) continue;
-    if (distToBox(d.box, x, z) > USE_RANGE) continue;
+    if (distToBox(d.box, x, z) > USE_RANGE || !atHeightOf(d.box, p.y)) continue;
     if (d.locked) return { kind: "door", id: d.id, label: d.name, price: 0, ok: false, why: "Cerrado con llave. Algo lo abre...", hold: false };
     return { kind: "door", id: d.id, label: d.name, price: d.price, ok: p.points >= d.price, why: p.points < d.price ? "No te alcanza" : undefined, hold: false };
   }
 
   // La luz.
-  if (!state.power && near(map.power.x, map.power.z)) return { kind: "power", id: 0, label: "Prender la luz", price: 0, ok: true, hold: false };
+  if (!state.power && near(map.power.x, map.power.z, USE_RANGE, map.power.y ?? 0)) return { kind: "power", id: 0, label: "Prender la luz", price: 0, ok: true, hold: false };
 
   // Las radios escondidas.
   for (let i = 0; i < map.radios.length; i++) {
     const r = map.radios[i]!;
-    if ((state.radios & (1 << i)) !== 0 || !near(r.x, r.z, 1.8) || Math.abs(r.y - (p.y + 1.2)) > 1.6) continue;
+    if ((state.radios & (1 << i)) !== 0 || !near(r.x, r.z, 1.8, p.y) || Math.abs(r.y - (p.y + 1.2)) > 1.6) continue;
     if (!state.power) return { kind: "radio", id: i, label: "Una radio vieja", price: 0, ok: false, why: "Sin corriente: primero la luz", hold: false };
     return { kind: "radio", id: i, label: "Una radio vieja", price: 0, ok: true, hold: false };
   }
 
   // Las ventanas: reparar.
   for (const b of map.barriers) {
-    if (distToBox(b.box, x, z) > BOARD_RANGE) continue;
+    if (distToBox(b.box, x, z) > BOARD_RANGE || !atHeightOf(b.box, p.y)) continue;
     const boards = state.boards[b.id] ?? 0;
     if (boards >= BOARD_MAX) return { kind: "barrier", id: b.id, label: "Ventana", price: 0, ok: false, why: "Entera", hold: true };
     return { kind: "barrier", id: b.id, label: "Reparar", price: 0, ok: true, hold: true };
   }
   return null;
+}
+
+/** Códigos de la fuga en `Interaction.id`: 0 la llave, 1 a 4 las piezas, 5 arreglar la lancha, 6 el faro, 7 subir. */
+function findQuest(state: GameState, p: PlayerState, map: GameMap, near: (x: number, z: number, range?: number, y?: number) => boolean): Interaction | null {
+  const q = map.quest;
+  if (!q) return null;
+  const e = state.egg;
+  const info = (label: string, why: string): Interaction => ({ kind: "quest", id: -1, label, price: 0, ok: false, why, hold: false });
+  const act = (id: number, label: string): Interaction => ({ kind: "quest", id, label, price: 0, ok: true, hold: false });
+  if ((e & EGG_BUILT) !== 0 && (e & EGG_KEY) === 0 && near(q.key.x, q.key.z, 2.2, q.key.y)) return act(0, `Agarrar ${q.key.name}`);
+  if ((e & EGG_KEY) !== 0) {
+    for (let i = 0; i < q.parts.length; i++) {
+      const part = q.parts[i]!;
+      if ((e & EGG_BOAT_PARTS[i]!) === 0 && near(part.x, part.z, 2.0, part.y)) return act(1 + i, `Agarrar ${part.name}`);
+    }
+  }
+  if (near(q.boat.x, q.boat.z, USE_RANGE + 1.2, q.boat.y)) {
+    if ((e & EGG_KEY) === 0) return info("Una lancha rota", "No arranca. Le faltan piezas");
+    if ((e & EGG_BOAT) === 0) {
+      const have = EGG_BOAT_PARTS.filter((b) => (e & b) !== 0).length;
+      if (have < EGG_BOAT_PARTS.length) return info("La lancha", `Faltan piezas (${have} de ${EGG_BOAT_PARTS.length})`);
+      return act(5, "Arreglar la lancha");
+    }
+    if ((e & EGG_BEACON) === 0) return info("La lancha", "Sin el faro no se cruza la niebla");
+    if ((e & EGG_READY) === 0) return info("La lancha", "Todavía no se abre la niebla: aguantá");
+    const missing = state.players.some((o) => o.connected && o.alive && !o.down && Math.hypot(o.x - q.boat.x, o.z - q.boat.z) > BOARD_RADIUS);
+    if (missing) return info("Subir a la lancha", "Faltan compañeros");
+    return act(7, "Subir a la lancha");
+  }
+  if ((e & EGG_BEACON) === 0 && near(q.beacon.x, q.beacon.z, USE_RANGE + 0.6, q.beacon.y)) {
+    if ((e & EGG_BOAT) === 0) return info("El reflector del faro", "Primero tiene que andar la lancha");
+    return act(6, "Prender el faro");
+  }
+  return null;
+}
+
+function stepQuest(state: GameState, id: number, byId: number, map: GameMap, events: SimEvent[]): void {
+  const q = map.quest;
+  if (!q) return;
+  if (id === 0) {
+    state.egg |= EGG_KEY;
+    events.push({ t: "egg", byId, step: 10 });
+  } else if (id >= 1 && id <= 4) {
+    state.egg |= EGG_BOAT_PARTS[id - 1]!;
+    events.push({ t: "egg", byId, step: 20 + (id - 1) });
+  } else if (id === 5) {
+    state.egg |= EGG_BOAT;
+    events.push({ t: "egg", byId, step: 30 });
+  } else if (id === 6) {
+    state.egg |= EGG_BEACON;
+    state.eggTicks = ESCAPE_SIEGE_TICKS;
+    events.push({ t: "egg", byId, step: 31 });
+  } else if (id === 7) {
+    // De acá se encarga stepRound: termina la partida.
+    state.egg |= EGG_ESCAPED;
+    events.push({ t: "egg", byId, step: 33 });
+  }
 }
 
 function pay(p: PlayerState, price: number): boolean {
@@ -296,6 +370,9 @@ export function stepUse(state: GameState, p: PlayerState, input: PlayerInput, ma
       events.push({ t: "door", id: d.id, byId: p.id });
       return;
     }
+    case "quest":
+      stepQuest(state, it.id, p.id, map, events);
+      return;
     case "power":
       state.power = true;
       events.push({ t: "power", byId: p.id });

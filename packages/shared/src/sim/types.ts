@@ -233,6 +233,8 @@ export interface GameState {
   songTicks: number;
   /** El easter egg: bits EGG_*. Las piezas son de todos. */
   egg: number;
+  /** Lo que queda del asedio de la fuga, en ticks (0 si no hay). */
+  eggTicks: number;
   /** Almas juntadas en el horno (zombis muertos cerca), hasta EGG_SOULS. */
   eggSouls: number;
   /** A qué ronda llegaron (cuando termina). */
@@ -287,6 +289,6 @@ export type SimEvent =
   /** Un zombi que sale del piso, arranca una tabla, o pasa la ventana (para el sonido). */
   | { t: "zombie"; what: "rise" | "tear" | "vault" | "groan"; id: number; x: number; y: number; z: number }
   | { t: "radio"; byId: number; which: number; all: boolean }
-  /** El easter egg avanza: una pieza agarrada (0, 1, 2), la Thunder Gun armada (3), o un alma más en el horno (4, con `souls`). */
+  /** El easter egg avanza: una pieza agarrada (0, 1, 2), la Thunder Gun armada (3), un alma más en el horno (4, con `souls`). La fuga: la llave (10), una pieza de la lancha (20 + cuál), lancha arreglada (30), faro (31), niebla abierta (32), escaparon (33). */
   | { t: "egg"; byId: number; step: number; souls?: number }
   | { t: "gameover"; round: number };

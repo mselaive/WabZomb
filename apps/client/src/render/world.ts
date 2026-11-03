@@ -16,6 +16,11 @@ import {
   TEX_METAL,
   TEX_WOOD,
   BOX_POOL,
+  EGG_BEACON,
+  EGG_BOAT,
+  EGG_BOAT_PARTS,
+  EGG_BUILT,
+  EGG_KEY,
   EGG_SOULS,
   weapon,
   weaponStats,
@@ -26,7 +31,9 @@ import {
   type UnpackedGrenade,
 } from "@wabzomb/shared";
 import { makeAllMaterials, makeChalkTexture, makeLabelTexture, makePuffTexture } from "./textures.js";
-import { buildGrenadeMesh, buildWeaponMesh } from "./viewmodel.js";
+import { RocaArt } from "./roca.js";
+import { buildBoat, buildFurnaceFront, buildPapMachine, buildQuestItem, buildWoodDoor, furnaceEmbers, powerPanelFace, buildPerkCabinet, buildSteelDoor, buildWindowFrame } from "./rocaProps.js";
+import { buildGrenadeMesh, buildWeaponMesh, setWeaponEnvironment } from "./viewmodel.js";
 
 function cylinderGeometry(b: Box): THREE.BufferGeometry {
   const r = Math.min(b.maxX - b.minX, b.maxZ - b.minZ) / 2;
@@ -155,6 +162,8 @@ interface Machine {
   group: THREE.Group;
   light: THREE.Mesh;
   lamp: THREE.PointLight | null;
+  /** Más materiales que se prenden junto con la luz. */
+  extra?: THREE.MeshStandardMaterial[];
 }
 
 /**
@@ -164,7 +173,12 @@ interface Machine {
  */
 export class World {
   readonly scene = new THREE.Scene();
-  readonly materials = makeAllMaterials();
+  readonly materials: THREE.MeshStandardMaterial[] = makeAllMaterials();
+  /** La dirección de arte del mapa, si tiene (materiales, luz horneada, modelos, mar...). */
+  art: RocaArt | null = null;
+  private readonly hemi: THREE.HemisphereLight;
+  onAssets: ((k: number) => void) | null = null;
+  onThunder: ((delay: number) => void) | null = null;
   private mapGroup = new THREE.Group();
   private propGroup = new THREE.Group();
   private doorMeshes: THREE.Group[] = [];
@@ -189,6 +203,8 @@ export class World {
   private benchGroup: THREE.Group | null = null;
   private furnaceMouth: THREE.Mesh | null = null;
   private furnaceLight: THREE.PointLight | null = null;
+  private questItems: THREE.Group[] = [];
+  private boat: { group: THREE.Group; lamp: THREE.MeshStandardMaterial; engine: THREE.Object3D; baseY: number } | null = null;
   readonly moon: THREE.DirectionalLight;
   private sky: THREE.Mesh | null = null;
   private map: GameMap | null = null;
@@ -196,8 +212,8 @@ export class World {
   private readonly puffTex = makePuffTexture();
 
   constructor() {
-    const hemi = new THREE.HemisphereLight(0x3c4c6a, 0x241e18, 0.95);
-    this.scene.add(hemi);
+    this.hemi = new THREE.HemisphereLight(0x3c4c6a, 0x241e18, 0.95);
+    this.scene.add(this.hemi);
     this.moon = new THREE.DirectionalLight(0x9fb4e0, 1.3);
     this.moon.position.set(-18, 30, -26);
     this.moon.castShadow = true;
@@ -222,6 +238,7 @@ export class World {
     const pmrem = new THREE.PMREMGenerator(renderer);
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environment = env;
+    setWeaponEnvironment(env);
     this.scene.environmentIntensity = 0.18;
     pmrem.dispose();
   }
@@ -230,6 +247,10 @@ export class World {
     this.map = map;
     this.mapGroup.clear();
     this.propGroup.clear();
+    if (this.art) {
+      this.art.dispose();
+      this.art = null;
+    }
     const sky = new THREE.Color(map.sky);
     const horizon = sky.clone().lerp(new THREE.Color(0x3a2e3a), 0.5);
     const top = sky.clone().lerp(new THREE.Color(0x02030a), 0.6);
@@ -238,6 +259,35 @@ export class World {
     if (this.sky) this.scene.remove(this.sky);
     this.sky = makeSky(top, horizon);
     this.scene.add(this.sky);
+
+    this.sky.visible = true;
+    this.hemi.color.set(0x3c4c6a);
+    this.hemi.groundColor.set(0x241e18);
+    this.hemi.intensity = 0.95;
+    this.moon.intensity = 1.3;
+    this.moon.castShadow = true;
+    this.moon.position.set(-18, 30, -26);
+
+    if (map.art) {
+      this.scene.background = new THREE.Color(0x1a222c);
+      this.sky.visible = false;
+      this.art = new RocaArt(this.scene, map, this.hemi, this.moon, this.materials);
+      this.art.onProgress = (k) => this.onAssets?.(k);
+      this.art.onThunder = (d) => this.onThunder?.(d);
+      this.mapGroup.add(this.art.group);
+      this.buildDoors(map);
+      this.buildBarriers(map);
+      this.buildWallWeapons(map);
+      this.buildPerks(map);
+      this.buildPap(map);
+      this.buildBox(map);
+      this.buildPower(map);
+      this.buildRadios(map);
+      this.buildEgg(map);
+      this.zoneLamps = [];
+      this.setPower(false, true);
+      return;
+    }
 
     const byTex: THREE.BufferGeometry[][] = Array.from({ length: TEX_COUNT }, () => []);
     for (const b of map.boxes) {
@@ -283,7 +333,13 @@ export class World {
       const h = b.maxY - b.minY;
       const dd = b.maxZ - b.minZ;
       const alongX = w > dd;
-      if (d.box.tex === TEX_WOOD || d.box.tex === 2) {
+      if (d.style === "bars") {
+        this.buildBarsDoor(g, b, alongX);
+      } else if (d.style === "wood") {
+        buildWoodDoor(g, b, this.materials[34]!, this.materials[26]!);
+      } else if (d.style === "steel") {
+        buildSteelDoor(g, b, this.materials[25] ?? this.materials[TEX_METAL]!);
+      } else if (d.box.tex === TEX_WOOD || d.box.tex === 2) {
         // Escombros: tablones cruzados y cajones.
         for (let i = 0; i < 5; i++) {
           const plank = new THREE.Mesh(new THREE.BoxGeometry(alongX ? w * 0.95 : 0.1, 0.18, alongX ? 0.1 : dd * 0.95), this.materials[TEX_WOOD]);
@@ -308,6 +364,8 @@ export class World {
           }
         }
       }
+      // Con luz horneada: la que le toca a la puerta. Se la mira del lado de donde se viene, así que se toma del medio.
+      this.art?.bakeLight(g, (b.minX + b.maxX) / 2 + (alongX ? 0 : 0.5), b.minY + 1.5, (b.minZ + b.maxZ) / 2 + (alongX ? 0.5 : 0), 0, 1, 0);
       // El precio flotando.
       const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(d.locked ? `${d.name} · con llave` : `${d.name} · ${d.price}`, "#ffd27a", 512, 30), transparent: true, depthTest: true }));
       label.scale.set(2.6, 0.33, 1);
@@ -318,11 +376,46 @@ export class World {
     }
   }
 
+  /** Una reja: barrotes redondos entre dos travesaños y un marco. */
+  private buildBarsDoor(g: THREE.Group, b: Box, alongX: boolean): void {
+    const steel = this.materials[25] ?? this.materials[TEX_METAL]!;
+    const w = alongX ? b.maxX - b.minX : b.maxZ - b.minZ;
+    const h = b.maxY - b.minY;
+    const cx = (b.minX + b.maxX) / 2;
+    const cz = (b.minZ + b.maxZ) / 2;
+    const n = Math.max(3, Math.round(w / 0.13));
+    const bar = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.018, 0.018, h, 6, 1, true), steel, n);
+    const m = new THREE.Matrix4();
+    for (let i = 0; i < n; i++) {
+      const k = ((i + 0.5) / n - 0.5) * w;
+      m.makeTranslation(cx + (alongX ? k : 0), b.minY + h / 2, cz + (alongX ? 0 : k));
+      bar.setMatrixAt(i, m);
+    }
+    bar.frustumCulled = false;
+    g.add(bar);
+    const rails = [0.06, 1.05, h - 0.06];
+    for (const y of rails) {
+      const r = new THREE.Mesh(new THREE.BoxGeometry(alongX ? w : 0.05, 0.07, alongX ? 0.05 : w), steel);
+      r.position.set(cx, b.minY + y, cz);
+      g.add(r);
+    }
+    for (const s of [-1, 1]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(alongX ? 0.08 : 0.12, h, alongX ? 0.12 : 0.08), steel);
+      post.position.set(cx + (alongX ? (s * w) / 2 : 0), b.minY + h / 2, cz + (alongX ? 0 : (s * w) / 2));
+      g.add(post);
+    }
+    // La cerradura.
+    const lock = new THREE.Mesh(new THREE.BoxGeometry(alongX ? 0.24 : 0.09, 0.3, alongX ? 0.09 : 0.24), new THREE.MeshStandardMaterial({ color: 0x2a2c2e, metalness: 0.8, roughness: 0.5 }));
+    lock.position.set(cx, b.minY + 1.1, cz);
+    g.add(lock);
+  }
+
   private buildBarriers(map: GameMap): void {
     this.boardMeshes = [];
-    const boardMat = this.materials[18]!;
+    const boardMat = this.materials[34] ?? this.materials[18]!;
     for (const b of map.barriers) {
       const box = b.box;
+      if (map.art && b.kind === "window") this.propGroup.add(buildWindowFrame(b, this.materials[25]!));
       const cx = (box.minX + box.maxX) / 2;
       const cz = (box.minZ + box.maxZ) / 2;
       const alongX = box.maxX - box.minX > box.maxZ - box.minZ;
@@ -335,13 +428,16 @@ export class World {
         const tilt = (i % 2 === 0 ? 1 : -1) * (0.08 + (i % 3) * 0.05);
         plank.rotation.set(alongX ? 0 : tilt, 0, alongX ? tilt : 0);
         plank.castShadow = true;
+        this.art?.bakeLight(plank, b.inside.x, box.minY + 1, b.inside.z);
         this.propGroup.add(plank);
         list.push(plank);
       }
       // El marco de la ventana.
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(alongX ? width + 0.2 : 0.14, 0.08, alongX ? 0.14 : width + 0.2), this.materials[TEX_WOOD]);
-      frame.position.set(cx, box.minY - 0.02, cz);
-      this.propGroup.add(frame);
+      if (!map.art) {
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(alongX ? width + 0.2 : 0.14, 0.08, alongX ? 0.14 : width + 0.2), this.materials[TEX_WOOD]);
+        frame.position.set(cx, box.minY - 0.02, cz);
+        this.propGroup.add(frame);
+      }
       this.boardMeshes.push(list);
     }
   }
@@ -356,10 +452,20 @@ export class World {
       // El plano mira a +Z de su espacio: se lo gira para que mire hacia la sala.
       plane.rotation.y = ww.yaw + Math.PI;
       this.propGroup.add(plane);
+      if (map.art) {
+        // En La Roca va en un tablón colgado: muchas caen sobre una reja, y la tiza sola no se apoyaría en nada.
+        const board = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.92, 0.04), this.materials[34]!);
+        const fx = -Math.sin(ww.yaw);
+        const fz = -Math.cos(ww.yaw);
+        board.position.set(ww.x - fx * 0.03, ww.y, ww.z - fz * 0.03);
+        board.rotation.y = plane.rotation.y;
+        this.propGroup.add(board);
+        this.art?.bakeLight(board, ww.x + fx * 0.8, ww.y, ww.z + fz * 0.8);
+      }
     }
   }
 
-  private machine(x: number, z: number, yaw: number, color: number, label: string, sub: string, w = 0.9, h = 1.9, d = 0.7): Machine {
+  private machine(x: number, z: number, yaw: number, color: number, label: string, sub: string, w = 0.9, h = 1.9, d = 0.7, y = 0): Machine {
     const g = new THREE.Group();
     const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.3 }));
     body.position.y = h / 2;
@@ -379,10 +485,14 @@ export class World {
     sub2.scale.set(1.5, 0.25, 1);
     sub2.position.y = h + 0.1;
     g.add(sub2);
-    const lamp = new THREE.PointLight(color, 0, 5, 1.8);
-    lamp.position.set(0, h * 0.7, -d);
-    g.add(lamp);
-    g.position.set(x, 0, z);
+    // Con luz horneada, el brillo de alrededor ya está en el lightmap.
+    let lamp: THREE.PointLight | null = null;
+    if (!this.art) {
+      lamp = new THREE.PointLight(color, 0, 5, 1.8);
+      lamp.position.set(0, h * 0.7, -d);
+      g.add(lamp);
+    }
+    g.position.set(x, y, z);
     g.rotation.y = yaw;
     this.propGroup.add(g);
     return { group: g, light: panel, lamp };
@@ -392,13 +502,38 @@ export class World {
     this.perkMachines = [];
     for (const m of map.perks) {
       const price = PERK_PRICES[m.perk] ?? 0;
-      this.perkMachines.push(this.machine(m.x, m.z, m.yaw, PERK_COLORS[m.perk] ?? 0xffffff, PERK_NAMES[m.perk] ?? "", `${price}`));
+      if (map.art) {
+        const { group, glow } = buildPerkCabinet(PERK_NAMES[m.perk] ?? "", `${price}`, PERK_COLORS[m.perk] ?? 0xffffff);
+        group.position.set(m.x, m.y ?? 0, m.z);
+        group.rotation.y = m.yaw;
+        const title = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(`${PERK_NAMES[m.perk] ?? ""} · ${price}`, "#ffffff", 512, 34), transparent: true, depthTest: true }));
+        title.scale.set(2.2, 0.28, 1);
+        title.position.y = 2.42;
+        group.add(title);
+        this.propGroup.add(group);
+        this.perkMachines.push({ group, light: new THREE.Mesh(undefined, glow[0]), lamp: null, extra: glow.slice(1) });
+        continue;
+      }
+      this.perkMachines.push(this.machine(m.x, m.z, m.yaw, PERK_COLORS[m.perk] ?? 0xffffff, PERK_NAMES[m.perk] ?? "", `${price}`, 0.9, 1.9, 0.7, m.y ?? 0));
     }
   }
 
   private buildPap(map: GameMap): void {
     const p = map.pap;
-    this.papMachine = this.machine(p.x, p.z, p.yaw, 0x3a2a5a, "Pack-a-Punch", `${PAP_PRICE}`, 1.6, 1.4, 1.0);
+    if (map.art) {
+      const { group, glow } = buildPapMachine();
+      group.position.set(p.x, p.y ?? 0, p.z);
+      group.rotation.y = p.yaw;
+      const title = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(`Pack-a-Punch · ${PAP_PRICE}`, "#d8b8ff", 512, 34), transparent: true, depthTest: true }));
+      title.scale.set(2.4, 0.3, 1);
+      title.position.y = 2.4;
+      group.add(title);
+      this.propGroup.add(group);
+      this.papMachine = { group, light: new THREE.Mesh(undefined, glow), lamp: null };
+      this.papWeapon = null;
+      return;
+    }
+    this.papMachine = this.machine(p.x, p.z, p.yaw, 0x3a2a5a, "Pack-a-Punch", `${PAP_PRICE}`, 1.6, 1.4, 1.0, p.y ?? 0);
     // Las luces de colores en el frente.
     const colors = [0xff2a6a, 0x2affd0, 0xffe02a, 0x7a2aff];
     colors.forEach((c, i) => {
@@ -412,11 +547,12 @@ export class World {
 
   private buildBox(map: GameMap): void {
     const g = new THREE.Group();
-    const chest = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.6, 0.7), this.materials[TEX_WOOD]);
+    const woodMat = this.materials[34] ?? this.materials[TEX_WOOD]!;
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.6, 0.7), woodMat);
     chest.position.y = 0.3;
     chest.castShadow = true;
     g.add(chest);
-    const trim = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.08, 0.74), this.materials[TEX_METAL]);
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.08, 0.74), this.materials[26] ?? this.materials[TEX_METAL]!);
     trim.position.y = 0.56;
     g.add(trim);
     // Signos de interrogación en los costados.
@@ -424,7 +560,21 @@ export class World {
     mark.scale.set(0.4, 0.4, 1);
     mark.position.set(0, 0.35, -0.37);
     g.add(mark);
-    this.boxLid = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 0.7), this.materials[TEX_WOOD]);
+    // Cinchas de hierro y las esquinas.
+    if (map.art) {
+      const iron = this.materials[26]!;
+      for (const x of [-0.42, 0.42]) {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.62, 0.74), iron);
+        band.position.set(x, 0.3, 0);
+        g.add(band);
+      }
+      for (const [x, z] of [[-0.65, -0.35], [0.65, -0.35], [-0.65, 0.35], [0.65, 0.35]] as const) {
+        const corner = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.64, 0.08), iron);
+        corner.position.set(x, 0.3, z);
+        g.add(corner);
+      }
+    }
+    this.boxLid = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 0.7), woodMat);
     this.boxLid.position.set(0, 0.6, 0.35);
     this.boxLid.geometry.translate(0, 0.05, -0.35);
     g.add(this.boxLid);
@@ -444,6 +594,10 @@ export class World {
     g.add(label);
     this.boxGroup = g;
     this.propGroup.add(g);
+    if (this.art) {
+      const s0 = map.boxSpots[0]!;
+      this.art.bakeLight(g, s0.x, (s0.y ?? 0) + 1, s0.z);
+    }
     this.boxWeapon = null;
     this.boxTeddy = null;
     this.placeBox(map, 0);
@@ -451,13 +605,13 @@ export class World {
 
   private placeBox(map: GameMap, spot: number): void {
     const s = map.boxSpots[spot] ?? map.boxSpots[0]!;
-    this.boxGroup!.position.set(s.x, 0, s.z);
+    this.boxGroup!.position.set(s.x, s.y ?? 0, s.z);
     this.boxGroup!.rotation.y = s.yaw;
   }
 
   private buildPower(map: GameMap): void {
     const g = new THREE.Group();
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.4, 0.3), this.materials[TEX_METAL]);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.4, 0.3), this.materials[27] ?? this.materials[TEX_METAL]!);
     panel.position.y = 1.1;
     g.add(panel);
     this.powerLever = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.08), new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.5 }));
@@ -469,7 +623,22 @@ export class World {
     label.scale.set(1.2, 0.3, 1);
     label.position.y = 2.1;
     g.add(label);
-    g.position.set(map.power.x, 0, map.power.z);
+    if (map.art) {
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.86, 1.36), new THREE.MeshStandardMaterial({ map: powerPanelFace(), roughness: 0.6, metalness: 0.3 }));
+      face.position.set(0, 1.1, -0.152);
+      face.rotation.y = Math.PI;
+      g.add(face);
+      // Una caja de conexiones arriba y los caños que suben al techo.
+      for (const x of [-0.25, 0, 0.25]) {
+        const conduit = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.3, 8), this.materials[26]!);
+        conduit.position.set(x, 2.45, 0);
+        g.add(conduit);
+      }
+      this.powerLever!.scale.setScalar(1.5);
+      this.powerLever!.position.set(0.56, 1.1, -0.1);
+    }
+    g.position.set(map.power.x, map.power.y ?? 0, map.power.z);
+    this.art?.bakeLight(g, map.power.x, (map.power.y ?? 0) + 1.2, map.power.z - 0.5, 0, 0, -1);
     g.rotation.y = map.power.yaw;
     this.propGroup.add(g);
   }
@@ -499,6 +668,9 @@ export class World {
       g.rotation.y = r.yaw;
       this.propGroup.add(g);
       this.radioMeshes.push(g);
+      this.art?.attachModel(g, "radio", 0.6, () => {
+        body.visible = grill.visible = dial.visible = antenna.visible = false;
+      });
     }
   }
 
@@ -524,15 +696,70 @@ export class World {
     label.scale.set(1.7, 0.28, 1);
     label.position.y = 1.6;
     g.add(label);
-    g.position.set(b.x, 0, b.z - 1.0);
+    if (map.art) {
+      this.art?.attachModel(g, "toolcart", 1, () => {
+        vise.visible = tools.visible = false;
+      });
+      label.position.y = 1.85;
+    }
+    g.position.set(b.x, b.y ?? 0, b.z - 1.0);
     g.rotation.y = b.yaw;
     this.propGroup.add(g);
     this.benchGroup = g;
     this.buildFurnace(map);
+    this.buildQuest(map);
+  }
+
+  /** La fuga: la lancha, la llave y las piezas. */
+  private buildQuest(map: GameMap): void {
+    const q = map.quest;
+    this.questItems = [];
+    this.boat = null;
+    if (!q) return;
+    const brass = new THREE.MeshStandardMaterial({ color: 0xb08a3c, metalness: 0.85, roughness: 0.35, envMapIntensity: 1 });
+    const iron = this.materials[26]!;
+    const wood = this.materials[34]!;
+    [q.key, ...q.parts].forEach((item, i) => {
+      const g = buildQuestItem(i, this.puffTex, brass, iron, wood);
+      g.position.set(item.x, item.y + item.h, item.z);
+      g.userData.baseY = item.y + item.h;
+      g.visible = false;
+      this.propGroup.add(g);
+      this.questItems.push(g);
+    });
+    const { group, lamp, engine } = buildBoat(wood, this.materials[25]!, iron);
+    group.position.set(q.boat.x, (map.art?.seaY ?? -13) - 0.25, q.boat.z + 5.2);
+    this.propGroup.add(group);
+    this.art?.bakeLight(group, q.boat.x, q.boat.y + 2, q.boat.z);
+    this.boat = { group, lamp, engine, baseY: group.position.y };
+  }
+
+  private updateQuest(egg: number, map: GameMap): void {
+    const q = map.quest;
+    if (!q) return;
+    const t = performance.now() / 1000;
+    this.questItems.forEach((g, i) => {
+      const taken = i === 0 ? (egg & EGG_KEY) !== 0 : (egg & (EGG_BOAT_PARTS[i - 1] ?? 0)) !== 0;
+      const visible = i === 0 ? (egg & EGG_BUILT) !== 0 && !taken : (egg & EGG_KEY) !== 0 && !taken;
+      g.visible = visible;
+      if (!visible) return;
+      g.rotation.y = t * 1.1;
+      g.position.y = g.userData.baseY + Math.sin(t * 2 + i) * 0.03;
+    });
+    if (this.boat) {
+      this.boat.group.position.y = this.boat.baseY + Math.sin(t * 0.8) * 0.09;
+      this.boat.group.rotation.z = Math.sin(t * 0.6) * 0.018;
+      this.boat.group.rotation.x = Math.sin(t * 0.47) * 0.012;
+      const fixed = (egg & EGG_BOAT) !== 0;
+      this.boat.engine.visible = !fixed;
+      this.boat.lamp.emissiveIntensity = fixed ? 2.4 : 0;
+    }
+    this.art?.setBeacon((egg & EGG_BEACON) !== 0);
   }
 
   /** Lo que ya se agarró desaparece. */
   updateEgg(egg: number, souls = 0): void {
+    if (this.map?.quest) this.updateQuest(egg, this.map);
     const bits = [2, 4, 8];
     // El gatillo recién aparece cuando el horno se llenó (bit 32).
     this.partMeshes.forEach((g, i) => (g.visible = (egg & (bits[i] ?? 0)) === 0 && (i !== 2 || (egg & 32) !== 0)));
@@ -555,25 +782,29 @@ export class World {
   private buildFurnace(map: GameMap): void {
     const f = map.furnace;
     const g = new THREE.Group();
-    const mouth = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 0.12), new THREE.MeshStandardMaterial({ color: 0x331a08, emissive: 0xff6a1a, emissiveIntensity: 0.2, roughness: 0.6 }));
+    const mouth = new THREE.Mesh(
+      new THREE.BoxGeometry(1.2, 0.9, 0.12),
+      new THREE.MeshStandardMaterial(map.art ? { color: 0x120804, emissive: 0xffffff, emissiveMap: furnaceEmbers(), emissiveIntensity: 0.2, roughness: 0.9 } : { color: 0x331a08, emissive: 0xff6a1a, emissiveIntensity: 0.2, roughness: 0.6 }),
+    );
     mouth.position.set(0, 1.0, 0);
     g.add(mouth);
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.2, 0.08), this.materials[TEX_METAL]);
+    if (map.art) g.add(buildFurnaceFront(this.materials[30]!, this.materials[26]!));
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.2, 0.08), this.materials[26] ?? this.materials[TEX_METAL]!);
     frame.position.set(0, 1.0, 0.06);
     g.add(frame);
     for (let i = 0; i < 4; i++) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.9, 0.06), this.materials[TEX_METAL]);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.9, 0.06), this.materials[26] ?? this.materials[TEX_METAL]!);
       bar.position.set(-0.45 + i * 0.3, 1.0, -0.06);
       g.add(bar);
     }
-    const light = new THREE.PointLight(0xff7a2a, 0.3, 7, 1.6);
+    const light = new THREE.PointLight(0xff7a2a, 0.3, this.art ? 9 : 7, 1.6);
     light.position.set(0, 1.0, -0.8);
     g.add(light);
     const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture("El horno", "#ff9a5a", 256, 34), transparent: true, depthTest: true }));
     label.scale.set(1.2, 0.3, 1);
-    label.position.y = 2.6;
+    label.position.set(0, 2.6, map.art ? -0.5 : 0);
     g.add(label);
-    g.position.set(f.x, 0, f.z);
+    g.position.set(f.x, f.y ?? 0, f.z);
     g.rotation.y = f.yaw;
     this.propGroup.add(g);
     this.furnaceMouth = mouth;
@@ -606,12 +837,14 @@ export class World {
   setPower(on: boolean, force = false): void {
     if (on === this.powerOn && !force) return;
     this.powerOn = on;
+    this.art?.setPower(on, force);
     for (const l of this.zoneLamps) {
       l.color.set(on ? 0xffe2b0 : 0xff5a3a);
       l.intensity = on ? 3.2 : 1.0;
     }
     for (const m of this.perkMachines) {
       (m.light.material as THREE.MeshStandardMaterial).emissiveIntensity = on ? 1.4 : 0.05;
+      for (const e of m.extra ?? []) e.emissiveIntensity = on ? 1.9 : 0.04;
       if (m.lamp) m.lamp.intensity = on ? 1.4 : 0;
     }
     if (this.papMachine) {
@@ -620,7 +853,7 @@ export class World {
       for (const b of this.papMachine.group.children) if (b.name === "bulb") ((b as THREE.Mesh).material as THREE.MeshStandardMaterial).emissiveIntensity = on ? 2.5 : 0;
     }
     if (this.powerLever) this.powerLever.rotation.x = on ? 0.9 : -0.9;
-    this.scene.environmentIntensity = on ? 0.3 : 0.18;
+    this.scene.environmentIntensity = this.art ? (on ? 0.14 : 0.08) : on ? 0.3 : 0.18;
   }
 
   /** Quick Revive se prende siempre (anda sin luz). */
@@ -628,6 +861,7 @@ export class World {
     const m = this.perkMachines[index];
     if (!m) return;
     (m.light.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.4;
+    for (const e of m.extra ?? []) e.emissiveIntensity = 1.9;
     if (m.lamp) m.lamp.intensity = 1.2;
   }
 
@@ -837,8 +1071,6 @@ function buildPart(kind: number, puff: THREE.Texture): THREE.Group {
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, color: c, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
   halo.scale.setScalar(0.9);
   g.add(halo);
-  const light = new THREE.PointLight(c, 1.0, 4, 1.6);
-  g.add(light);
   g.userData.baseY = 0;
   return g;
 }

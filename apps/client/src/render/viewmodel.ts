@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { FRAG, KNIFE, M1911, RAYGUN, THUNDERGUN, weapon, weaponStats, type WeaponLook } from "@wabzomb/shared";
 
 /**
@@ -26,18 +27,120 @@ const PAP_BODY: Mat = { color: 0x2d1f4a, metal: 0.6, rough: 0.35, emissive: 0x12
 const PAP_GLOW: Mat = { color: 0xb06cff, metal: 0.2, rough: 0.3, emissive: 0x7a3cff };
 
 const mats = new Map<string, THREE.MeshStandardMaterial>();
+let weaponEnv: THREE.Texture | null = null;
+
+/** El reflejo propio de las armas: en un mapa oscuro, el metal sin nada que reflejar se ve negro. */
+export function setWeaponEnvironment(env: THREE.Texture): void {
+  weaponEnv = env;
+  for (const m of mats.values()) {
+    m.envMap = env;
+    m.envMapIntensity = m.metalness > 0.3 ? 0.4 : 0.12;
+    m.needsUpdate = true;
+  }
+}
+
+/** Una textura pintada una sola vez: los gastes del metal, la veta de la madera. */
+function painted(size: number, paint: (ctx: CanvasRenderingContext2D, s: number) => void): THREE.Texture {
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  paint(c.getContext("2d")!, size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+
+let wearCache: THREE.Texture | null = null;
+/** Gris medio con rayones claros y manchas: sirve de rugosidad y de relieve. */
+function wearTexture(): THREE.Texture {
+  wearCache ??= painted(256, (ctx, s) => {
+    ctx.fillStyle = "#a8a8a8";
+    ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 90; i++) {
+      const v = Math.random() < 0.5 ? 60 : 225;
+      ctx.strokeStyle = `rgba(${v},${v},${v},${0.1 + Math.random() * 0.35})`;
+      ctx.lineWidth = 0.5 + Math.random() * 1.2;
+      const x = Math.random() * s;
+      const y = Math.random() * s;
+      const a = Math.random() * 6.28;
+      const l = 6 + Math.random() * 60;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+      ctx.stroke();
+    }
+    for (let i = 0; i < 26; i++) {
+      const x = Math.random() * s;
+      const y = Math.random() * s;
+      const r = 8 + Math.random() * 40;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, "rgba(255,255,255,0.22)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+  });
+  return wearCache;
+}
+
+let grainCache: THREE.Texture | null = null;
+function grainTexture(): THREE.Texture {
+  grainCache ??= painted(256, (ctx, s) => {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 150; i++) {
+      ctx.strokeStyle = `rgba(40,22,10,${0.05 + Math.random() * 0.22})`;
+      ctx.lineWidth = 0.6 + Math.random() * 1.8;
+      const x = Math.random() * s;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.bezierCurveTo(x + (Math.random() - 0.5) * 18, s * 0.33, x + (Math.random() - 0.5) * 18, s * 0.66, x, s);
+      ctx.stroke();
+    }
+  });
+  grainCache.colorSpace = THREE.SRGBColorSpace;
+  return grainCache;
+}
+
 function mat(m: Mat): THREE.MeshStandardMaterial {
   const key = `${m.color}-${m.metal ?? 0}-${m.rough ?? 0.5}-${m.emissive ?? 0}`;
   let out = mats.get(key);
   if (!out) {
-    out = new THREE.MeshStandardMaterial({ color: m.color, metalness: m.metal ?? 0, roughness: m.rough ?? 0.5, emissive: m.emissive ?? 0 });
+    const metal = m.metal ?? 0;
+    // Madera y plásticos: lo que no brilla y tiene color cálido lleva veta.
+    const c = new THREE.Color(m.color);
+    const warm = metal < 0.2 && c.r > c.b * 1.25;
+    out = new THREE.MeshStandardMaterial({
+      color: m.color,
+      metalness: metal,
+      roughness: Math.min(1, (m.rough ?? 0.5) * 1.25),
+      emissive: m.emissive ?? 0,
+      roughnessMap: wearTexture(),
+      bumpMap: wearTexture(),
+      bumpScale: 0.25,
+      ...(warm ? { map: grainTexture() } : {}),
+      ...(weaponEnv ? { envMap: weaponEnv, envMapIntensity: metal > 0.3 ? 0.4 : 0.12 } : {}),
+    });
     mats.set(key, out);
   }
   return out;
 }
 
+const roundCache = new Map<string, THREE.BufferGeometry>();
+/** Una caja con las aristas biseladas: es lo que le da un brillo creíble al metal. */
+function bevelBox(w: number, h: number, d: number): THREE.BufferGeometry {
+  const key = `${w}|${h}|${d}`;
+  let g = roundCache.get(key);
+  if (!g) {
+    const small = Math.min(w, h, d);
+    g = small < 0.006 ? new THREE.BoxGeometry(w, h, d) : new RoundedBoxGeometry(w, h, d, 2, Math.min(small * 0.22, 0.007));
+    roundCache.set(key, g);
+  }
+  return g;
+}
+
 function box(g: THREE.Object3D, w: number, h: number, d: number, x: number, y: number, z: number, m: Mat, rx = 0, ry = 0, rz = 0): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(m));
+  const mesh = new THREE.Mesh(bevelBox(w, h, d), mat(m));
   mesh.position.set(x, y, z);
   mesh.rotation.set(rx, ry, rz);
   mesh.castShadow = true;
@@ -47,7 +150,7 @@ function box(g: THREE.Object3D, w: number, h: number, d: number, x: number, y: n
 
 /** Un cilindro a lo largo de Z (el caño). */
 function tube(g: THREE.Object3D, r: number, len: number, x: number, y: number, z: number, m: Mat, segments = 10): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, segments), mat(m));
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, Math.max(14, segments)), mat(m));
   mesh.rotation.x = Math.PI / 2;
   mesh.position.set(x, y, z);
   mesh.castShadow = true;
@@ -57,7 +160,7 @@ function tube(g: THREE.Object3D, r: number, len: number, x: number, y: number, z
 
 /** Un cilindro a lo largo de X (bulones, manijas, el tambor). */
 function pin(g: THREE.Object3D, r: number, len: number, x: number, y: number, z: number, m: Mat, segments = 8): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, segments), mat(m));
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, Math.max(12, segments)), mat(m));
   mesh.rotation.z = Math.PI / 2;
   mesh.position.set(x, y, z);
   g.add(mesh);
@@ -72,9 +175,22 @@ function sights(g: THREE.Object3D, y: number, front: number, rear: number, m: Ma
 function pistol(g: THREE.Group, look: WeaponLook, bodyMat: Mat, frameMat: Mat): void {
   const len = look.body;
   const tall = 0.036;
-  box(g, 0.03, tall, len, 0, 0.03, -len / 2 + 0.03, bodyMat).name = "slide";
+  const slide = box(g, 0.03, tall, len, 0, 0.03, -len / 2 + 0.03, bodyMat);
+  slide.name = "slide";
+  // Estrías de agarre atrás, ventana de eyección y boca.
+  const dark: Mat = { color: 0x101114, metal: 0.5, rough: 0.6 };
+  for (const s of [-1, 1]) for (let i = 0; i < 6; i++) box(slide, 0.001, tall * 0.5, 0.002, s * 0.0152, 0.002, len / 2 - 0.012 - i * 0.005, dark);
+  box(slide, 0.002, 0.014, len * 0.26, 0.0155, 0.009, -len * 0.05, dark);
+  box(slide, 0.02, 0.003, len * 0.92, 0, tall / 2 + 0.0005, 0, { color: 0x1c1e22, metal: 0.6, rough: 0.5 });
   box(g, 0.028, 0.025, len * 0.75, 0, 0.005, -len * 0.38 + 0.02, frameMat);
   box(g, 0.027, 0.11, 0.036, 0.0, -0.045, 0.012, { color: look.wood, rough: 0.7 }, 0.22);
+  // Las cachas con su tornillo, el martillo y el seguro.
+  for (const s of [-1, 1]) {
+    box(g, 0.002, 0.08, 0.026, s * 0.0145, -0.044, 0.013, { color: darken(look.wood, 22), rough: 0.85 }, 0.22);
+    pin(g, 0.004, 0.003, s * 0.0158, -0.04, 0.012, STEEL_LIGHT, 8);
+  }
+  box(g, 0.007, 0.018, 0.012, 0, 0.056, 0.038, STEEL, -0.45);
+  box(g, 0.004, 0.006, 0.018, 0.016, 0.018, 0.012, STEEL);
   box(g, 0.004, 0.028, 0.04, 0, -0.02, -0.03, frameMat);
   box(g, 0.004, 0.018, 0.005, 0, -0.012, -0.025, STEEL);
   tube(g, 0.006, 0.03 + look.barrel, 0, 0.032, -len + 0.03 - look.barrel / 2, STEEL_LIGHT, 8);
@@ -130,6 +246,12 @@ function longGun(g: THREE.Group, look: WeaponLook, bodyMat: Mat, woodMat: Mat, m
   // Ventana de eyección y manija de carga del lado derecho.
   box(g, 0.004, 0.02, Math.min(0.08, B * 0.3), 0.023, 0.04, bodyZ - B * 0.1, STEEL_LIGHT);
   pin(g, 0.006, 0.03, 0.028, 0.055, bodyZ + B * 0.25, STEEL);
+  // Remaches, el riel de la tapa y la línea del cajón.
+  const seam: Mat = { color: 0x101114, metal: 0.5, rough: 0.6 };
+  for (const s of [-1, 1]) {
+    box(g, 0.002, 0.003, B * 0.92, s * 0.0225, 0.012, bodyZ, seam);
+    for (let i = 0; i < 3; i++) pin(g, 0.0035, 0.002, s * 0.023, 0.02, bodyZ - B * 0.3 + i * B * 0.3, STEEL_LIGHT, 8);
+  }
   // Guardamanos y caño.
   const handZ = bodyZ - B / 2 - look.barrel * 0.28;
   const handLen = Math.max(0.1, look.barrel * 0.55);
@@ -139,6 +261,8 @@ function longGun(g: THREE.Group, look: WeaponLook, bodyMat: Mat, woodMat: Mat, m
     box(g, 0.046, 0.05, look.barrel * 0.4, 0, 0.02, handZ, woodMat);
   } else {
     box(g, 0.046, 0.05, handLen, 0, 0.03, handZ, woodMat);
+    // Ranuras de ventilación del guardamanos.
+    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) box(g, 0.002, 0.014, handLen * 0.12, s * 0.0235, 0.038, handZ - handLen * 0.33 + i * handLen * 0.22, seam);
     tube(g, 0.012, Math.max(0.05, look.barrel * 0.45), 0, 0.055, handZ - handLen / 2 - 0.02, STEEL, 8);
     tube(g, 0.009, look.barrel, 0, 0.05, bodyZ - B / 2 - look.barrel / 2, STEEL, 8);
     // Boca con el apagallamas.
@@ -219,6 +343,53 @@ function longGun(g: THREE.Group, look: WeaponLook, bodyMat: Mat, woodMat: Mat, m
   }
 }
 
+/**
+ * El trabuco giratorio: culata de madera, un cuerpo de bronce con manivela al
+ * costado, y un haz de seis caños acampanados que da vuelta con cada tiro.
+ */
+function trabuco(g: THREE.Group, look: WeaponLook, pap: boolean): void {
+  const brass: Mat = pap ? { color: 0x4a2e7a, metal: 0.8, rough: 0.3, emissive: 0x160a30 } : { color: look.color, metal: 0.85, rough: 0.38 };
+  const iron: Mat = { color: pap ? 0x20142f : 0x2c2e31, metal: 0.75, rough: 0.45 };
+  const wood: Mat = pap ? { color: 0x1c1430, metal: 0.3, rough: 0.6 } : { color: look.wood, metal: 0.05, rough: 0.72 };
+  const glow: Mat = { color: 0xb06cff, emissive: 0x7a3cff, metal: 0.2, rough: 0.3 };
+  // Culata y empuñadura.
+  box(g, 0.04, 0.066, 0.26, 0, 0.0, 0.2, wood, 0.12);
+  box(g, 0.042, 0.09, 0.03, 0, -0.024, 0.33, { ...wood, color: darken(wood.color, 18) }, 0.12);
+  box(g, 0.032, 0.1, 0.044, 0, -0.05, 0.075, wood, 0.32);
+  box(g, 0.004, 0.024, 0.04, 0, -0.016, 0.02, STEEL);
+  // El cuerpo: dos tambores de bronce y el eje que los une.
+  tube(g, 0.042, 0.13, 0, 0.022, -0.015, brass, 18);
+  tube(g, 0.047, 0.016, 0, 0.022, 0.05, brass, 18);
+  tube(g, 0.047, 0.016, 0, 0.022, -0.08, brass, 18);
+  // La manivela, del lado izquierdo.
+  pin(g, 0.008, 0.04, -0.06, 0.022, -0.015, iron, 8);
+  box(g, 0.008, 0.06, 0.01, -0.08, 0.045, -0.015, iron);
+  pin(g, 0.009, 0.03, -0.094, 0.07, -0.015, wood, 8);
+  // El haz, en su propio grupo: es lo que gira.
+  const spin = new THREE.Group();
+  spin.name = "spin";
+  spin.position.set(0, 0.022, -0.09);
+  g.add(spin);
+  const len = look.barrel;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const x = Math.cos(a) * 0.028;
+    const y = Math.sin(a) * 0.028;
+    tube(spin, 0.0105, len, x, y, -len / 2, iron, 12);
+    // La boca acampanada: un cono abierto hacia adelante.
+    const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.0175, 0.0105, 0.05, 14, 1, true), mat(brass));
+    bell.rotation.x = -Math.PI / 2;
+    bell.position.set(x * 1.14, y * 1.14, -len - 0.02);
+    bell.material = mat(brass);
+    (bell.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+    spin.add(bell);
+  }
+  // Los aros que atan el haz.
+  for (const z of [-0.03, -len * 0.55, -len + 0.03]) tube(spin, 0.044, 0.012, 0, 0, z, pap ? glow : brass, 18);
+  // La guía de puntería.
+  box(g, 0.006, 0.02, 0.008, 0, 0.078, -0.03, iron);
+}
+
 /** La Ray Gun: cuerpo rechoncho, boca redonda y bobinas verdes que brillan. */
 function rayGun(g: THREE.Group, look: WeaponLook, pap: boolean): void {
   const body: Mat = { color: pap ? 0x5a2c6e : look.color, metal: 0.7, rough: 0.3 };
@@ -280,6 +451,10 @@ export function buildWeaponMesh(id: number, firstPerson: boolean, pap = false): 
     thunderGun(g, look, pap);
     rightHand = [0, -0.07, 0.06];
     leftHand = [0, -0.02, -0.26];
+  } else if (look.rotary) {
+    trabuco(g, look, pap);
+    rightHand = [0, -0.07, 0.075];
+    leftHand = [0.0, -0.035, -0.2];
   } else if (w.cls === "wonder") {
     rayGun(g, look, pap);
     rightHand = [0, -0.07, 0.02];
@@ -293,7 +468,7 @@ export function buildWeaponMesh(id: number, firstPerson: boolean, pap = false): 
     rightHand = [0, -0.07, 0.04];
     leftHand = [0, -0.005, -look.body / 2 + 0.05 - look.body / 2 - look.barrel * 0.28];
   }
-  if (pap && id !== FRAG && id !== KNIFE && w.cls !== "wonder") {
+  if (pap && id !== FRAG && id !== KNIFE && w.cls !== "wonder" && !look.rotary) {
     // Vetas que brillan a lo largo del cuerpo.
     for (let i = 0; i < 3; i++) box(g, 0.047, 0.004, look.body * 0.8, 0, 0.012 + i * 0.018, -look.body / 2 + 0.05, PAP_GLOW);
   }
@@ -359,6 +534,7 @@ export function muzzleOffset(id: number): THREE.Vector3 {
   const w = weapon(id);
   const look = w.look;
   if (id === THUNDERGUN) return new THREE.Vector3(0, 0.03, -0.55);
+  if (look.rotary) return new THREE.Vector3(0, 0.022, -0.09 - look.barrel - 0.05);
   if (w.cls === "wonder") return new THREE.Vector3(0, 0.04, -0.33);
   if (w.cls === "pistol") return new THREE.Vector3(0, 0.032, -look.body + 0.03 - look.barrel);
   return new THREE.Vector3(0, 0.05, -look.body / 2 + 0.05 - look.body / 2 - look.barrel);
@@ -388,6 +564,7 @@ export class ViewModel {
   private magHome = new THREE.Vector3();
   private slide: THREE.Object3D | null = null;
   private slideHome = new THREE.Vector3();
+  private spin: THREE.Object3D | null = null;
   private pump: THREE.Object3D | null = null;
   private pumpHome = new THREE.Vector3();
   private lhand: THREE.Object3D | null = null;
@@ -447,6 +624,7 @@ export class ViewModel {
     };
     this.mag = find("mag", this.magHome);
     this.slide = find("slide", this.slideHome);
+    this.spin = this.mesh?.getObjectByName("spin") ?? null;
     this.pump = find("pump", this.pumpHome);
     this.lhand = find("lhand", this.lhandHome);
     this.rhand = find("rhand", this.rhandHome);
@@ -620,6 +798,8 @@ export class ViewModel {
     }
 
     if (this.slide) this.slide.position.set(this.slideHome.x, this.slideHome.y, this.slideHome.z + 0.035 * Math.max(this.slideT, slideBack));
+    // El haz de caños da un sexto de vuelta por tiro (el tiempo que dura el ciclo del arma).
+    if (this.spin && this.cycleT > 0) this.spin.rotation.z += (dt / Math.max(0.05, this.cycleTotal)) * (Math.PI / 3);
     let cycleTilt = 0;
     if (this.cycleT > 0) {
       this.cycleT = Math.max(0, this.cycleT - dt);

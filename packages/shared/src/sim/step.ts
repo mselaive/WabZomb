@@ -1,4 +1,4 @@
-import { ACT_GRENADE, ACT_NONE, EGG_FURNACE, EGG_SONG, EGG_SOULS, FALL_DAMAGE_PER_MS, FALL_SAFE_SPEED, MAX_HP, SOUL_RANGE, START_POINTS, TRAIL_LENGTH } from "../constants.js";
+import { ACT_GRENADE, ACT_NONE, EGG_READY, EGG_FURNACE, EGG_SONG, EGG_SOULS, FALL_DAMAGE_PER_MS, FALL_SAFE_SPEED, MAX_HP, SOUL_RANGE, START_POINTS, TRAIL_LENGTH } from "../constants.js";
 import type { Box, GameMap } from "../map/types.js";
 import { M1911 } from "../weapons.js";
 import { applySlotAction, damagePlayer, recordTrail, resolveMelee, resolveShot, shotRewind, stepMelee, stepWeaponState, tryThrow } from "./combat.js";
@@ -93,6 +93,7 @@ export function createGameState(): GameState {
     songTicks: 0,
     egg: 0,
     eggSouls: 0,
+    eggTicks: 0,
     reachedRound: 0,
     seed: 1,
     mapIndex: 0,
@@ -171,7 +172,28 @@ export function step(state: GameState, inputs: ReadonlyMap<number, PlayerInput[]
   for (const p of state.players) if (p.alive) recordTrail(p, state.tick);
 
   stepSouls(state, map, events, eventsBefore);
+  stepSiege(state, events);
   stepRound(state, map, events);
+}
+
+/** El asedio de la fuga: mientras dura no hay descanso entre rondas ni se acaban los zombis. */
+function stepSiege(state: GameState, events: SimEvent[]): void {
+  if (state.eggTicks <= 0) return;
+  const r = state.round;
+  if (r.phase !== "live") {
+    r.phase = "live";
+    r.spawned = 0;
+    r.killed = 0;
+    r.total = 8;
+    r.nextSpawnAt = state.tick;
+    events.push({ t: "round", phase: "live", number: r.number });
+  }
+  r.total = Math.max(r.total, r.spawned + 6);
+  if (--state.eggTicks > 0) return;
+  // Se abrió la niebla: los que están en pie son los últimos.
+  r.total = r.spawned;
+  state.egg |= EGG_READY;
+  events.push({ t: "egg", byId: -1, step: 32 });
 }
 
 /**
@@ -184,7 +206,7 @@ function stepSouls(state: GameState, map: GameMap, events: SimEvent[], from: num
   for (let i = from; i < n; i++) {
     const e = events[i]!;
     if (e.t !== "zkill" || e.byId < 0) continue;
-    if (Math.hypot(e.x - map.furnace.x, e.z - map.furnace.z) > SOUL_RANGE) continue;
+    if (Math.hypot(e.x - map.furnace.x, e.z - map.furnace.z) > SOUL_RANGE || Math.abs(e.y - (map.furnace.y ?? 0)) > 3) continue;
     state.eggSouls++;
     events.push({ t: "egg", byId: e.byId, step: 4, souls: state.eggSouls });
     if (state.eggSouls >= EGG_SOULS) {

@@ -34,6 +34,8 @@ export interface WeaponLook {
   double?: boolean;
   /** Brilla (la Ray Gun). */
   glow?: number;
+  /** Un haz de caños acampanados que gira (el trabuco). */
+  rotary?: boolean;
 }
 
 export interface WeaponDef {
@@ -93,7 +95,7 @@ const WOOD = 0x7d4b22;
 const WOOD_LIGHT = 0x9a6230;
 const OLIVE = 0x4e5a3f;
 const TAN = 0xb2a07c;
-const SILVER = 0xb9b2a4;
+const SILVER = 0x8d9096;
 const GREEN_RAY = 0x2fbf6a;
 
 const W = (d: WeaponDef): WeaponDef => d;
@@ -125,9 +127,18 @@ export const RAYGUN = 23;
 export const FRAG = 24;
 /** Se arma con las piezas del easter egg: no está en la pared ni en la caja. */
 export const THUNDERGUN = 25;
+/** Un trabuco de seis caños con manivela: abre todo lo que tiene adelante. Sale de la caja, poco. */
+export const TRABUCO = 26;
+export const THOMPSON = 27;
+export const BAR = 28;
+export const WINCHESTER = 29;
+export const LUGER = 30;
+export const GARAND = 31;
+export const SPRINGFIELD = 32;
+export const PPSH = 33;
 /** Pseudoarmas de los eventos: caída y manotazo de zombi. */
-export const FALL_WEAPON = 30;
-export const ZOMBIE_WEAPON = 31;
+export const FALL_WEAPON = 60;
+export const ZOMBIE_WEAPON = 61;
 
 const pistolLook = (color: number, body: number, barrel: number, wood = DARK): WeaponLook => ({ body, barrel, color, wood, mag: "none", magLen: 0, stock: "none" });
 
@@ -313,6 +324,62 @@ export const WEAPONS: readonly WeaponDef[] = [
     spread: 0, spreadShot: 0, spreadMove: 0, speed: 4.8, zoom: 0, kick: 0.08, recoilUp: 0.05, recoilSide: 0, explosive: 0, blast: 9,
     pap: { name: "Zeus Cannon", damage: 0, mag: 4, reserve: 24, blast: 13 },
     look: { body: 0.36, barrel: 0.3, color: 0x6b6f75, wood: 0x2a2d31, mag: "none", magLen: 0, stock: "poly", glow: 0x9ad0ff },
+  }),
+  W({
+    id: TRABUCO, name: "Trabuco giratorio", short: "Trabuco", cls: "shotgun", wall: 0, box: 0.5,
+    damage: 55, head: 1.5, range: 0.45, mag: 6, reserve: 60, fireTicks: 7, reloadTicks: 64, drawTicks: 10, auto: false, pellets: 12,
+    spread: 0.075, spreadShot: 0.012, spreadMove: 0.03, speed: 4.6, zoom: 0, kick: 0.08, recoilUp: 0.05, recoilSide: 0.015, explosive: 0,
+    pap: { name: "El Sepulturero", damage: 120, mag: 12, reserve: 96, fireTicks: 5 },
+    look: { body: 0.2, barrel: 0.34, color: 0x8a6a30, wood: WOOD, mag: "none", magLen: 0, stock: "wood", rotary: true },
+  }),
+  W({
+    id: THOMPSON, name: "Thompson M1928", short: "Thompson", cls: "smg", wall: 1200, box: 1,
+    damage: 50, head: 2.2, range: 0.8, mag: 50, reserve: 300, fireTicks: 2, reloadTicks: 66, drawTicks: 7, auto: true, pellets: 1,
+    spread: 0.025, spreadShot: 0.006, spreadMove: 0.02, speed: 5.1, zoom: 0, kick: 0.018, recoilUp: 0.012, recoilSide: 0.008, explosive: 0,
+    pap: { name: "La Máquina de Escribir", damage: 110, mag: 75, reserve: 450 },
+    look: { body: 0.3, barrel: 0.24, color: STEEL, wood: WOOD, mag: "drum", magLen: 0.1, stock: "wood" },
+  }),
+  W({
+    id: BAR, name: "BAR M1918", short: "BAR", cls: "ar", wall: 0, box: 1,
+    damage: 90, head: 2.5, range: 0.92, mag: 20, reserve: 200, fireTicks: 3, reloadTicks: 58, drawTicks: 9, auto: true, pellets: 1,
+    spread: 0.018, spreadShot: 0.008, spreadMove: 0.03, speed: 4.5, zoom: 0, kick: 0.028, recoilUp: 0.024, recoilSide: 0.01, explosive: 0,
+    pap: { name: "El Bramido", damage: 180, mag: 40, reserve: 320 },
+    look: { body: 0.34, barrel: 0.5, color: DARK, wood: WOOD, mag: "straight", magLen: 0.12, stock: "wood", bipod: true },
+  }),
+  W({
+    id: WINCHESTER, name: "Winchester 1897", short: "Winchester", cls: "shotgun", wall: 1500, box: 1,
+    damage: 38, head: 1.5, range: 0.55, mag: 6, reserve: 60, fireTicks: 14, reloadTicks: 66, drawTicks: 8, auto: false, pellets: 8,
+    spread: 0.04, spreadShot: 0.01, spreadMove: 0.03, speed: 4.8, zoom: 0, kick: 0.055, recoilUp: 0.035, recoilSide: 0.01, explosive: 0,
+    pap: { name: "La Barredora", damage: 75, mag: 12, reserve: 96 },
+    look: { body: 0.22, barrel: 0.56, color: STEEL, wood: WOOD_LIGHT, mag: "tube", magLen: 0.46, stock: "wood" },
+  }),
+  W({
+    id: LUGER, name: "Luger P08", short: "Luger", cls: "pistol", wall: 0, box: 1,
+    damage: 70, head: 3, range: 0.84, mag: 8, reserve: 96, fireTicks: 4, reloadTicks: 40, drawTicks: 5, auto: false, pellets: 1,
+    spread: 0.012, spreadShot: 0.004, spreadMove: 0.015, speed: 5.3, zoom: 0, kick: 0.018, recoilUp: 0.016, recoilSide: 0.004, explosive: 0,
+    pap: { name: "La Condesa", damage: 240, mag: 16, reserve: 128 },
+    look: pistolLook(DARK, 0.21, 0.06, WOOD_LIGHT),
+  }),
+  W({
+    id: GARAND, name: "M1 Garand", short: "Garand", cls: "ar", wall: 1000, box: 1,
+    damage: 130, head: 3, range: 0.95, mag: 8, reserve: 120, fireTicks: 5, reloadTicks: 44, drawTicks: 8, auto: false, pellets: 1,
+    spread: 0.012, spreadShot: 0.008, spreadMove: 0.03, speed: 4.8, zoom: 0, kick: 0.032, recoilUp: 0.028, recoilSide: 0.008, explosive: 0,
+    pap: { name: "El Clavo", damage: 320, mag: 12, reserve: 156 },
+    look: { body: 0.32, barrel: 0.54, color: DARK, wood: WOOD_LIGHT, mag: "none", magLen: 0, stock: "wood" },
+  }),
+  W({
+    id: SPRINGFIELD, name: "Springfield 1903", short: "Springfield", cls: "sniper", wall: 0, box: 1,
+    damage: 350, head: 5, range: 0.99, mag: 5, reserve: 50, fireTicks: 24, reloadTicks: 64, drawTicks: 11, auto: false, pellets: 1,
+    spread: 0.07, spreadShot: 0.02, spreadMove: 0.08, speed: 4.5, zoom: 3, kick: 0.055, recoilUp: 0.02, recoilSide: 0, explosive: 0,
+    pap: { name: "La Última Palabra", damage: 1100, mag: 8, reserve: 72 },
+    look: { body: 0.3, barrel: 0.62, color: STEEL, wood: WOOD, mag: "none", magLen: 0, stock: "wood", scope: true },
+  }),
+  W({
+    id: PPSH, name: "PPSh-41", short: "PPSh", cls: "smg", wall: 0, box: 1,
+    damage: 42, head: 2, range: 0.74, mag: 71, reserve: 355, fireTicks: 1, reloadTicks: 74, drawTicks: 7, auto: true, pellets: 1,
+    spread: 0.03, spreadShot: 0.005, spreadMove: 0.02, speed: 5.1, zoom: 0, kick: 0.012, recoilUp: 0.009, recoilSide: 0.008, explosive: 0,
+    pap: { name: "El Enjambre", damage: 85, mag: 142, reserve: 568 },
+    look: { body: 0.28, barrel: 0.3, color: DARK, wood: WOOD, mag: "drum", magLen: 0.1, stock: "wood" },
   }),
 ];
 

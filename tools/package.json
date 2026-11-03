@@ -1,0 +1,19 @@
+{
+  "name": "wabzomb-tools",
+  "private": true,
+  "type": "module",
+  "description": "Herramientas que corren a mano para preparar los assets de La Roca. No forman parte del juego ni del build.",
+  "dependencies": {
+    "@gltf-transform/cli": "^4.2.0",
+    "@gltf-transform/core": "^4.2.0",
+    "@gltf-transform/extensions": "^4.2.0",
+    "@gltf-transform/functions": "^4.2.0",
+    "meshoptimizer": "^0.25.0",
+    "sharp": "^0.34.0",
+    "tsx": "^4.19.0"
+  },
+  "scripts": {
+    "assets": "node assets.mjs",
+    "bake": "tsx bake.ts"
+  }
+}

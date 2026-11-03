@@ -7,3 +7,7 @@ dist/
 .env
 .env.local
 .DS_Store
+
+# Descargas crudas de la herramienta de assets
+tools/.cache/
+tools/node_modules/

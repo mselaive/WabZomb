@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOARD_MAX } from "../constants.js";
-import { buildNavGrid, cellsOfBox, findPath, hasFloorNear, navGridFor } from "../sim/nav.js";
+import { buildNavGrid, findPath, hasFloorNear, navGridFor, nodesOfBox } from "../sim/nav.js";
 import { createGameState } from "../sim/step.js";
 import { openZones } from "../sim/zombies.js";
 import { FABRICA } from "./fabrica.js";
@@ -35,7 +35,7 @@ describe("La Fábrica", () => {
   it("con las puertas cerradas no se pasa de la oficina", () => {
     const state = createGameState();
     const blocked = new Set<number>();
-    for (const d of map.doors) for (const c of cellsOfBox(grid, d.box)) blocked.add(c);
+    for (const d of map.doors) for (const c of nodesOfBox(grid, d.box)) blocked.add(c);
     expect(blocked.size).toBeGreaterThan(0);
     const s = map.spawns[0]!;
     const dep = map.zones[1]!;

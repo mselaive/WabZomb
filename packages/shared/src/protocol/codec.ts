@@ -81,7 +81,7 @@ export function decodeServer(raw: string): ServerMsg | null {
 
 // ------------------------------------------------------------ snapshots
 
-const SLOT_BASE = 32;
+const SLOT_BASE = 64;
 
 export function packPlayer(p: PlayerState, own: boolean): SnapPlayer {
   let flags = 0;

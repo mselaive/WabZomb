@@ -26,11 +26,14 @@ const DROP_COST = 6;
 
 const cache = new WeakMap<GameMap, NavGrid>();
 
+/** Un poco más ancho que el cuerpo: un camino que apenas roza una esquina traba al que lo sigue. */
+const CLEARANCE = PLAYER_HALF_W + 0.01;
+
 function blockedAt(boxes: readonly Box[], x: number, y: number, z: number): boolean {
   const top = y + PLAYER_HEIGHT;
   for (const b of boxes) {
     if (b.decal) continue;
-    if (x + PLAYER_HALF_W > b.minX && x - PLAYER_HALF_W < b.maxX && y < b.maxY && top > b.minY && z + PLAYER_HALF_W > b.minZ && z - PLAYER_HALF_W < b.maxZ)
+    if (x + CLEARANCE > b.minX && x - CLEARANCE < b.maxX && y < b.maxY && top > b.minY && z + CLEARANCE > b.minZ && z - CLEARANCE < b.maxZ)
       return true;
   }
   return false;
@@ -40,7 +43,7 @@ function floorsAt(boxes: readonly Box[], x: number, z: number): number[] {
   const tops: number[] = [];
   for (const b of boxes) {
     if (b.decal) continue;
-    if (x + PLAYER_HALF_W > b.minX && x - PLAYER_HALF_W < b.maxX && z + PLAYER_HALF_W > b.minZ && z - PLAYER_HALF_W < b.maxZ) {
+    if (x + CLEARANCE > b.minX && x - CLEARANCE < b.maxX && z + CLEARANCE > b.minZ && z - CLEARANCE < b.maxZ) {
       if (!tops.some((t) => Math.abs(t - b.maxY) < 0.01)) tops.push(b.maxY);
     }
   }
@@ -48,7 +51,27 @@ function floorsAt(boxes: readonly Box[], x: number, z: number): number[] {
   return tops.filter((t) => !blockedAt(boxes, x, t + 0.02, z));
 }
 
+/** Las cajas por cuadrado de 4 m: armar la grilla mirándolas todas en cada celda es lentísimo en un mapa grande. */
+function columnIndex(map: GameMap): (x: number, z: number) => readonly Box[] {
+  const size = 4;
+  const m = map.bounds;
+  const cols = Math.ceil((m.maxX - m.minX) / size) + 1;
+  const rows = Math.ceil((m.maxZ - m.minZ) / size) + 1;
+  const lists: Box[][] = Array.from({ length: cols * rows }, () => []);
+  const clampTo = (v: number, n: number) => Math.max(0, Math.min(n - 1, Math.floor(v)));
+  for (const b of map.boxes) {
+    if (b.decal) continue;
+    const c0 = clampTo((b.minX - CLEARANCE - m.minX) / size, cols);
+    const c1 = clampTo((b.maxX + CLEARANCE - m.minX) / size, cols);
+    const r0 = clampTo((b.minZ - CLEARANCE - m.minZ) / size, rows);
+    const r1 = clampTo((b.maxZ + CLEARANCE - m.minZ) / size, rows);
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) lists[r * cols + c]!.push(b);
+  }
+  return (x, z) => lists[clampTo((z - m.minZ) / size, rows) * cols + clampTo((x - m.minX) / size, cols)]!;
+}
+
 export function buildNavGrid(map: GameMap, cell = 0.5): NavGrid {
+  const near = columnIndex(map);
   const minX = map.bounds.minX;
   const minZ = map.bounds.minZ;
   const cols = Math.ceil((map.bounds.maxX - minX) / cell);
@@ -63,7 +86,7 @@ export function buildNavGrid(map: GameMap, cell = 0.5): NavGrid {
       start[i] = floors.length;
       const x = minX + (c + 0.5) * cell;
       const z = minZ + (r + 0.5) * cell;
-      for (const f of floorsAt(map.boxes, x, z)) {
+      for (const f of floorsAt(near(x, z), x, z)) {
         floors.push(f);
         cellOfNode.push(i);
       }
@@ -151,7 +174,19 @@ export function walkable(g: NavGrid, c: number, r: number): boolean {
   return c >= 0 && r >= 0 && c < g.cols && r < g.rows && g.walk[r * g.cols + c] === 1;
 }
 
-/** Las celdas que tapa una caja (para bloquear las puertas cerradas). */
+/** Los nodos que tapa una caja: en su columna, los que tienen el piso a la altura de la caja. */
+export function nodesOfBox(g: NavGrid, b: Box): number[] {
+  const out: number[] = [];
+  for (const cell of cellsOfBox(g, b)) {
+    for (let k = g.start[cell]!; k < g.start[cell + 1]!; k++) {
+      const f = g.nodeFloor[k]!;
+      if (f < b.maxY && f + PLAYER_HEIGHT > b.minY) out.push(k);
+    }
+  }
+  return out;
+}
+
+/** Las celdas que tapa una caja. */
 export function cellsOfBox(g: NavGrid, b: Box): number[] {
   const out: number[] = [];
   const [c0, r0] = cellOf(g, b.minX + 0.01, b.minZ + 0.01);
@@ -203,16 +238,14 @@ function forEachNeighbor(g: NavGrid, a: number, fn: (b: number, cost: number) =>
       const nr = r + dr;
       if (nc < 0 || nr < 0 || nc >= g.cols || nr >= g.rows) continue;
       const ncell = nr * g.cols + nc;
-      if (blocked?.has(ncell)) continue;
       const diagonal = dc !== 0 && dr !== 0;
       if (diagonal) {
-        const sideA = r * g.cols + (c + dc);
-        const sideB = (r + dr) * g.cols + c;
-        if (blocked?.has(sideA) || blocked?.has(sideB)) continue;
-        if (nodeFrom(g, sideA, from, STEP_HEIGHT) < 0 || nodeFrom(g, sideB, from, STEP_HEIGHT) < 0) continue;
+        const sideA = nodeFrom(g, r * g.cols + (c + dc), from, STEP_HEIGHT);
+        const sideB = nodeFrom(g, (r + dr) * g.cols + c, from, STEP_HEIGHT);
+        if (sideA < 0 || sideB < 0 || blocked?.has(sideA) || blocked?.has(sideB)) continue;
       }
       const b = nodeFrom(g, ncell, from, MAX_DROP);
-      if (b < 0) continue;
+      if (b < 0 || blocked?.has(b)) continue;
       const drop = from - g.nodeFloor[b]!;
       fn(b, (diagonal ? 1.41 : 1) + (drop > STEP_HEIGHT + 0.01 ? DROP_COST : 0));
     }
@@ -245,7 +278,7 @@ export interface NavPoint {
 }
 
 /**
- * A* de (fromX, fromY, fromZ) a (toX, toY, toZ). `blocked` son celdas por las
+ * A* de (fromX, fromY, fromZ) a (toX, toY, toZ). `blocked` son nodos por los
  * que no se pasa (las puertas cerradas). Devuelve los puntos del camino sin el
  * de partida, simplificado; null si no hay camino.
  */

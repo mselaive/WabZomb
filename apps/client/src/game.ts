@@ -18,6 +18,8 @@ import {
   HIT_WORLD,
   INTERP_DELAY_MS,
   MS_PER_TICK,
+  EGG_BOAT_PARTS,
+  EGG_ESCAPED,
   EGG_FURNACE,
   EGG_PART_NAMES,
   EGG_RADIO_NOTES,
@@ -67,6 +69,8 @@ import {
   type UnpackedPlayer,
   type UnpackedRound,
   type UnpackedZombie,
+  TICK_RATE,
+  zoneAt,
 } from "@wabzomb/shared";
 import { Audio } from "./audio.js";
 import { InputController } from "./input.js";
@@ -76,6 +80,7 @@ import { Predictor, type PredictedShot } from "./net/prediction.js";
 import { Effects } from "./render/effects.js";
 import { PlayerAvatar } from "./render/players.js";
 import { ViewModel, muzzleOffset } from "./render/viewmodel.js";
+import { Post } from "./render/post.js";
 import { World } from "./render/world.js";
 import { ZombieAvatar, buildZombieCorpse } from "./render/zombies.js";
 import type { UI } from "./ui.js";
@@ -87,7 +92,10 @@ const CORPSE_MS = 12_000;
 
 export class Game {
   private renderer!: THREE.WebGLRenderer;
-  private readonly camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, 220);
+  private readonly camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, 3400);
+  private post: Post | null = null;
+  /** Se apaga para sacar capturas desde otro lado. */
+  lobbyDrift = true;
   private readonly world = new World();
   private effects!: Effects;
   private viewModel!: ViewModel;
@@ -219,11 +227,18 @@ export class Game {
     const w = this.stage.clientWidth || window.innerWidth;
     const h = this.stage.clientHeight || window.innerHeight;
     this.renderer.setSize(w, h, false);
+    this.post?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
 
   private lobbyCamera(): void {
+    if (this.map?.art) {
+      // Broadway, de punta a punta: el plano del menú.
+      this.camera.position.set(20, 1.6, 0.6);
+      this.camera.lookAt(-24, 3.4, 0);
+      return;
+    }
     this.camera.position.copy(LOBBY_CAMERA);
     this.camera.lookAt(0, 0, -4);
   }
@@ -348,11 +363,27 @@ export class Game {
   }
 
   private mapLoaded = -1;
+  private assetsBar: HTMLElement | null = null;
+
+  /** Lo que tarda en bajar un mapa con assets: se avisa abajo, y se puede jugar igual mientras tanto. */
+  private showAssets(k: number): void {
+    if (!this.assetsBar) {
+      const el = document.createElement("div");
+      el.style.cssText = "position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:40;padding:6px 14px;border-radius:6px;background:rgba(10,12,16,.82);color:#e8e2cc;font:600 13px Rajdhani,ui-sans-serif,sans-serif;letter-spacing:.04em;pointer-events:none";
+      document.body.append(el);
+      this.assetsBar = el;
+    }
+    this.assetsBar.textContent = `Cargando la prisión · ${Math.round(k * 100)} %`;
+    this.assetsBar.hidden = k >= 1;
+  }
 
   private loadMap(index: number): void {
     if (index === this.mapLoaded) return;
     this.mapLoaded = index;
     this.map = mapByIndex(index);
+    this.showAssets(this.map.art ? 0 : 1);
+    this.world.onAssets = (k) => this.showAssets(k);
+    this.world.onThunder = (d) => this.audio.thunder(d);
     this.world.load(this.map);
     this.latestDoors = -1;
     this.boxes = collisionBoxes({ doorsOpen: 0 }, this.map);
@@ -413,6 +444,7 @@ export class Game {
     this.shadow.radios = msg.radios;
     this.shadow.egg = msg.egg;
     this.shadow.eggSouls = msg.souls;
+    this.shadow.eggTicks = msg.siege;
     this.world.updateEgg(msg.egg, msg.souls);
     this.shadow.phase = msg.phase;
     this.shadow.round.number = this.latestRound.number;
@@ -500,7 +532,7 @@ export class Game {
         this.viewModel.setHidden(true);
         this.audio.stopSong();
         this.songOn = false;
-        this.ui.showResult(msg.reached, msg.st, this.myId);
+        this.ui.showResult(msg.reached, msg.st, this.myId, (msg.egg & EGG_ESCAPED) !== 0);
         break;
       }
     }
@@ -581,7 +613,10 @@ export class Game {
         return;
       case "door": {
         const d = this.map.doors[ev.id];
-        if (d) this.audio.door((d.box.minX + d.box.maxX) / 2, (d.box.minZ + d.box.maxZ) / 2);
+        if (d) {
+          this.audio.door((d.box.minX + d.box.maxX) / 2, (d.box.minZ + d.box.maxZ) / 2);
+          if (this.map.art && d.style === "bars") this.audio.buzzer((d.box.minX + d.box.maxX) / 2, (d.box.minZ + d.box.maxZ) / 2);
+        }
         return;
       }
       case "power":
@@ -607,9 +642,28 @@ export class Game {
           return;
         }
         this.audio.powerUp();
-        if (ev.step === 5) this.ui.showBanner("El horno se llenó", "blood", 3500, EGG_STEP_NOTES[2]);
-        else if (ev.step === 3) this.ui.showBanner("Thunder Gun armada", "gold", 4000, EGG_STEP_NOTES[3]);
-        else this.ui.showBanner(`Una pieza: ${EGG_PART_NAMES[ev.step] ?? ""}`, "gold", 4000, ev.step === 2 ? "Con las tres piezas, al banco de trabajo del taller" : EGG_STEP_NOTES[ev.step]);
+        {
+          const q = this.map.quest;
+          const steps = q?.notes.steps ?? EGG_STEP_NOTES;
+          if (q && ev.step >= 10) {
+            if (ev.step === 10) this.ui.showBanner(`${q.key.name[0]!.toUpperCase()}${q.key.name.slice(1)}`, "gold", 9000, q.notes.key);
+            else if (ev.step >= 20 && ev.step < 30) {
+              const have = EGG_BOAT_PARTS.filter((b) => (this.shadow.egg & b) !== 0).length + 1;
+              this.ui.showBanner(`${q.parts[ev.step - 20]?.name ?? "Una pieza"} (${have} de ${EGG_BOAT_PARTS.length})`, "gold", 4000, q.notes.part);
+            } else if (ev.step === 30) this.ui.showBanner("La lancha arranca", "gold", 8000, q.notes.boat);
+            else if (ev.step === 31) {
+              this.audio.siren();
+              this.ui.showBanner("El faro", "blood", 7000, q.notes.beacon);
+            } else if (ev.step === 32) {
+              this.audio.boatHorn();
+              this.ui.showBanner("Se abrió la niebla", "gold", 8000, q.notes.ready);
+            } else if (ev.step === 33) this.audio.boatHorn();
+            return;
+          }
+          if (ev.step === 5) this.ui.showBanner("El horno se llenó", "blood", 3500, steps[2]);
+          else if (ev.step === 3) this.ui.showBanner("Thunder Gun armada", "gold", 4000, steps[3]);
+          else this.ui.showBanner(`Una pieza: ${EGG_PART_NAMES[ev.step] ?? ""}`, "gold", 4000, steps[ev.step]);
+        }
         return;
       case "box":
         if (ev.what === "open") this.audio.boxOpen();
@@ -667,7 +721,7 @@ export class Game {
       case "radio":
         this.audio.radio();
         // El diario del ingeniero, una entrada por radio; con las tres, la canción y el armario.
-        this.ui.showBanner(ev.all ? "Las tres radios" : `Radio ${(this.shadow.radios.toString(2).split("1").length - 1)} de 3`, "gold", 9000, EGG_RADIO_NOTES[ev.which] ?? "");
+        this.ui.showBanner(ev.all ? "Las tres radios" : `Radio ${(this.shadow.radios.toString(2).split("1").length - 1)} de 3`, "gold", 9000, (this.map.quest?.notes.radios ?? EGG_RADIO_NOTES)[ev.which] ?? "");
         return;
       case "gameover":
         this.audio.gameOver();
@@ -752,7 +806,26 @@ export class Game {
     this.audio.listenerYaw = this.camera.rotation.y;
     this.audio.listenerX = this.camera.position.x;
     this.audio.listenerZ = this.camera.position.z;
-    this.renderer.render(this.world.scene, this.camera);
+    if (this.world.art) {
+      // El menú y la sala: la cámara avanza despacio por Broadway.
+      if (this.lobbyDrift && this.phase === "lobby") {
+        const k = ((now / 1000) * 0.45) % 34;
+        this.camera.position.set(17 - k, 1.7, 0.7 * Math.sin(k * 0.13));
+        this.camera.lookAt(-24, 3.2 + Math.sin(k * 0.2) * 0.4, 0);
+      }
+      const zone = zoneAt(this.map, this.camera.position.x, this.camera.position.z, this.camera.position.y - 1.6);
+      const outdoor = zone < 0 || this.map.zones[zone]?.outdoor === true;
+      this.world.art.update(dt, this.camera.position, outdoor);
+      this.audio.setAmbience(outdoor);
+      if (!this.post) {
+        this.post = new Post(this.renderer, this.world.scene, this.camera);
+        this.post.setSize(this.stage.clientWidth || window.innerWidth, this.stage.clientHeight || window.innerHeight);
+      }
+      this.post.render(dt);
+    } else {
+      this.audio.stopAmbience();
+      this.renderer.render(this.world.scene, this.camera);
+    }
   }
 
   private handleIntents(): void {
@@ -832,7 +905,9 @@ export class Game {
       this.world.updateRadios(this.shadow.radios, this.shadow.songTicks > 0);
       this.ui.setRound(frame.round.number, frame.round.phase, frame.round.total, frame.round.killed, frame.zombies.length);
       const soulsOn = (this.shadow.egg & EGG_SONG) !== 0 && (this.shadow.egg & EGG_FURNACE) === 0;
-      this.ui.setEffects(this.shadow.instaKill, this.shadow.doublePoints, this.shadow.fireSale, soulsOn ? this.shadow.eggSouls : -1);
+      const siege = this.shadow.eggTicks;
+      const note = siege > 0 ? `Aguantá ${Math.floor(siege / TICK_RATE / 60)}:${String(Math.floor(siege / TICK_RATE) % 60).padStart(2, "0")}` : "";
+      this.ui.setEffects(this.shadow.instaKill, this.shadow.doublePoints, this.shadow.fireSale, soulsOn ? this.shadow.eggSouls : -1, note);
       this.ui.setMates(frame.players.filter((p) => p.id !== this.myId && p.connected));
     }
     // La canción del easter egg.

@@ -433,6 +433,7 @@ export class GameRoom extends Server<Env> {
       radios: s.radios,
       egg: s.egg,
       souls: s.eggSouls,
+      siege: s.eggTicks,
       st: packStandings(s),
       reached: s.reachedRound,
       ...(this.events.length > 0 ? { ev: this.events } : {}),

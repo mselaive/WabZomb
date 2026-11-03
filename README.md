@@ -1,8 +1,9 @@
 # WabZomb
 
 Zombis por rondas en primera persona, estilo Call of Duty Zombies, para jugar solo o hasta cuatro
-con amigos desde el navegador. Low-poly con texturas de prototipo, todo generado por código: no se
-descarga ni un asset. Es el hermano de WabCS: mismo motor 3D, misma infra, mismo netcode.
+con amigos desde el navegador. Es el hermano de WabCS: mismo motor 3D, misma infra, mismo netcode.
+Tiene dos mapas: **La Roca**, una penitenciaría producida con materiales PBR y luz horneada, y **La
+Fábrica**, el original, todo generado por código y sin bajar ni un asset.
 
 - **Cliente**: Vite + TypeScript + Three.js → se despliega en Vercel.
 - **Servidor**: Cloudflare Worker + Durable Objects (`partyserver`) → una sala = un Durable Object
@@ -55,7 +56,36 @@ Los puertos son distintos de los de WabCS (5173 y 8787) para poder tener los dos
   quedan a distancia, y al levantarte salen empujados y tenés 2,5 s sin que te toquen. Si caen
   todos, se terminó: queda la ronda a la que llegaron.
 
-### El mapa: La Fábrica
+### El mapa: La Roca
+
+Una penitenciaría en una isla, de noche, con tormenta y niebla. La planta sale de los planos
+públicos de Alcatraz (Servicio de Parques de EE. UU.): cuatro bloques de celdas de tres pisos,
+Broadway por el medio, Times Square con su reloj, el hospital arriba del comedor, la ciudadela de
+piedra abajo. Es un mapa propio: ningún modelo, textura, personaje ni sonido sale de otro juego.
+
+Los zombis salen de las celdas tapiadas: arrancan los tablones desde adentro y entran al pasillo.
+Las balas pasan entre los barrotes. Hay tres alturas caminables, todas por escalera.
+
+| Zona | Cómo se llega | Qué hay |
+|---|---|---|
+| Broadway | se arranca acá | M14, Olympia, Quick Revive en una celda abierta, un lugar de la caja |
+| Times Square | reja 750 | MP40, Juggernog, el reloj |
+| Control | reja 750 | granadas |
+| Galería | reja 1000 (desde Broadway) | el segundo piso, con puentes sobre Broadway |
+| Michigan Avenue | reja 1000 (desde Times Square o Control) | AK74u, Mule Kick, un lugar de la caja |
+| Calle D | reja 1000 (desde Times Square o Control) | PM63, el aislamiento, la biblioteca, dos lugares de la caja |
+| Comedor | puerta 1000 (desde Times Square) | M16, Stakeout, mesas largas, un lugar de la caja |
+| Cocina | puerta 1000 (desde el comedor) | Speed Cola |
+| Patio de recreo | puerta 1250 (desde el comedor) | a cielo abierto: MP5K, Stamin-Up, gradas, un lugar de la caja |
+| Hospital | puerta 1250 (desde la galería) | las salas de internación, un lugar de la caja |
+| Azotea | reja 1000 (desde el hospital) | la terraza y el techo de los bloques; una escalera de incendios baja al patio (750) |
+| Administración | puerta 1250 (desde Control) | Python, Double Tap, oficina del alcaide, visitas, armería, el banco de trabajo |
+| El muelle | portón 1500 (desde el patio o administración) | a cielo abierto: **Pack-a-Punch** al final del espigón, un lugar de la caja |
+| La ciudadela | reja 1500 (desde la calle D) | **la luz**, el horno, los calabozos del fuerte viejo |
+
+Hasta prender la luz sólo hay faroles rojos de emergencia y la luna que entra por los tragaluces.
+
+### El otro mapa: La Fábrica
 
 Una fábrica abandonada de noche, ocho zonas y dos caminos para dar la vuelta entera.
 
@@ -120,10 +150,16 @@ Hay tres radios viejas escondidas en el mapa, y sin corriente no dicen nada. Con
 prendida, cada una cuenta una página del diario del ingeniero: qué estaba haciendo la fábrica y
 dónde quedaron las piezas. Las tres juntas hacen sonar una canción y abren algo que estaba con
 llave. De ahí en adelante hay tres piezas para juntar: una bajo llave, una arriba de algo, y una
-que la escupe **el horno** de las calderas cuando se le dieron suficientes almas (zombis muertos
-al lado). Con las tres, en el banco de trabajo del taller se arma la **Thunder Gun**: un soplido
+que la escupe **el horno** cuando se le dieron suficientes almas (zombis muertos al lado). Con las
+tres, en el banco de trabajo se arma la **Thunder Gun**: un soplido
 que se lleva a todos los zombis que tenga adelante, 2 tiros por cargador. Mejorada es la **Zeus
 Cannon**. Dónde está cada cosa, no lo dice el README.
+
+En La Roca sigue: **la fuga**, una historia propia contada en las grabaciones de un médico de la
+prisión. Con la Thunder Gun armada aparece una llave; con la llave se juntan las piezas de una
+lancha; con la lancha lista hay que prender el faro, que hasta ese momento está apagado, y aguantar
+dos minutos de asedio sin descanso hasta que se abra la niebla. Si todos los que están de pie llegan
+a la lancha, escapan y termina la partida.
 
 ## Cómo está hecho
 
@@ -146,10 +182,35 @@ Lo nuevo:
 - **Armas por descripción** (`weapons.ts` → `look`): cada una es un cuerpo, un caño, un cargador,
   una culata y una mira; el cliente arma el modelo de cajas con eso. Mejorada se pinta violeta.
 
+### Cómo se hizo La Roca
+
+- **Pisos** (`map/types.ts`, `sim/nav.ts`, `sim/interact.ts`): las zonas pueden tener un rango de
+  altura, las puertas bloquean nodos de la grilla (no columnas enteras) y comprar mira también la
+  altura: la máquina de abajo no se usa desde la galería.
+- **Colisión y dibujo separados**: `map/roca.ts` tiene las cajas que chocan, más un bloque `art`
+  que sólo lee el cliente (luces, modelos, filas de celdas, barandas). El servidor no paga nada.
+- **Luz horneada** (`tools/bake.ts`, `map/lightmap.ts`): luz directa con sombras, luna, cielo y dos
+  rebotes, en dos imágenes (apagada y prendida). Cliente y herramienta calculan igual dónde va cada
+  cara, así que si se cambian las cajas del mapa **hay que volver a hornear**.
+- **Lo que no entra en el lightmap** (`render/roca.ts`): las celdas, los barrotes y los modelos son
+  instancias, y cada una lleva sus dos colores de luz calculados al cargar.
+- **Cámara** (`render/post.ts`): resplandor, grado de color, viñeta y grano. Si anda por debajo de
+  40 cuadros durante unos segundos, baja la resolución sola.
+
+Los assets son de [Poly Haven](https://polyhaven.com), con licencia CC0, y se listan en
+`apps/client/public/roca/CREDITOS.md`. Para regenerarlos:
+
+```bash
+cd tools
+npm install
+npm run assets      # baja y optimiza texturas y modelos
+npm run bake        # hornea la luz (unos diez minutos; con --fast, tres)
+```
+
 ### Tests
 
 ```bash
-npm test          # vitest: mapa, zombis, rondas, compras, tiros, cooperativo
+npm test          # vitest: mapas, zombis, rondas, compras, tiros, cooperativo
 npm run typecheck
 npm run smoke     # compila el cliente y comprueba que el bundle arranque (playwright)
 ```

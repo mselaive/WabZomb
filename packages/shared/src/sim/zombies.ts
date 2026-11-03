@@ -11,16 +11,16 @@ import {
   ZOMBIE_SPEEDS,
   ZOMBIE_WAIT_RANGE,
   ZOMBIE_WINDUP_TICKS,
+  SIEGE_SPAWN_FACTOR,
   zombieHp,
   zombieSpawnInterval,
   zombieTypeFor,
 } from "../constants.js";
 import { lerp, wrapAngle } from "../math.js";
-import { segmentClear } from "../map/raycast.js";
 import { zoneAt, type Box, type GameMap, type Spawner } from "../map/types.js";
 import { damagePlayer, recordTrail, resetTrail } from "./combat.js";
 import { moveBody, overlapsAny } from "./movement.js";
-import { cellsOfBox, findPath, navGridFor, type NavGrid } from "./nav.js";
+import { findPath, navGridFor, nodesOfBox, type NavGrid } from "./nav.js";
 import { Z_ATTACK, Z_HUNT, Z_OUTSIDE, Z_RISING, Z_TEARING, Z_VAULT, type GameState, type PlayerState, type SimEvent, type ZombieState } from "./types.js";
 
 /** Cada cuántos ticks un zombi recalcula el camino (repartido entre ellos). */
@@ -32,12 +32,39 @@ const LOST_TICKS = 40 * 20;
 /** A menos de esto de alguien cuenta como "cerca". */
 const ENGAGED_RANGE = 6;
 
-/** Las celdas que tapan las puertas cerradas: por ahí no pasa el A*. */
+/** ¿Se puede caminar derecho de un punto a otro? A la altura de la rodilla, y contando rejas y barandas (que las balas atraviesan). */
+function walkClear(ax: number, ay: number, az: number, bx: number, bz: number, boxes: readonly Box[]): boolean {
+  const y = ay + 0.6;
+  const dx = bx - ax;
+  const dz = bz - az;
+  const pad = 0.3;
+  for (const b of boxes) {
+    if (b.decal || y <= b.minY || y >= b.maxY) continue;
+    // El segmento contra la caja agrandada por el ancho del cuerpo.
+    let t0 = 0;
+    let t1 = 1;
+    let miss = false;
+    for (const [o, d, lo, hi] of [[ax, dx, b.minX - pad, b.maxX + pad], [az, dz, b.minZ - pad, b.maxZ + pad]] as const) {
+      if (Math.abs(d) < 1e-6) {
+        if (o < lo || o > hi) miss = true;
+        continue;
+      }
+      const a = (lo - o) / d;
+      const c = (hi - o) / d;
+      t0 = Math.max(t0, Math.min(a, c));
+      t1 = Math.min(t1, Math.max(a, c));
+    }
+    if (!miss && t0 <= t1) return false;
+  }
+  return true;
+}
+
+/** Los nodos que tapan las puertas cerradas: por ahí no pasa el A*. */
 export function blockedCells(state: GameState, map: GameMap, grid: NavGrid): Set<number> {
   const out = new Set<number>();
   for (const d of map.doors) {
     if ((state.doorsOpen & (1 << d.id)) !== 0) continue;
-    for (const c of cellsOfBox(grid, d.box)) out.add(c);
+    for (const c of nodesOfBox(grid, d.box)) out.add(c);
   }
   return out;
 }
@@ -73,7 +100,7 @@ export function activeSpawners(state: GameState, map: GameMap): Spawner[] {
   const occupied = new Set<number>();
   for (const p of state.players) {
     if (!p.connected || !p.alive) continue;
-    const z = zoneAt(map, p.x, p.z);
+    const z = zoneAt(map, p.x, p.z, p.y);
     if (z >= 0) occupied.add(z);
   }
   const active = new Set<number>(occupied);
@@ -138,7 +165,7 @@ function spawnZombies(state: GameState, map: GameMap, events: SimEvent[]): void 
   const z = createZombie(state, s, map, rng);
   state.zombies.push(z);
   r.spawned++;
-  r.nextSpawnAt = state.tick + zombieSpawnInterval(r.number);
+  r.nextSpawnAt = state.tick + Math.ceil(zombieSpawnInterval(r.number) * (state.eggTicks > 0 ? SIEGE_SPAWN_FACTOR : 1));
   if (z.state === Z_RISING) events.push({ t: "zombie", what: "rise", id: z.id, x: z.x, y: z.y, z: z.z });
 }
 
@@ -150,7 +177,8 @@ function nearestTarget(state: GameState, z: ZombieState): PlayerState | null {
     for (const p of state.players) {
       if (!p.connected || !p.alive) continue;
       if (pass === 0 ? p.down : !p.down) continue;
-      const d = Math.hypot(p.x - z.x, p.z - z.z);
+      // Un piso de diferencia pesa: el de arriba de la cabeza no es el más cercano.
+      const d = Math.hypot(p.x - z.x, p.z - z.z) + Math.abs(p.y - z.y) * 3;
       if (d < bestD) {
         bestD = d;
         best = p;
@@ -195,7 +223,7 @@ function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly
   const speed = ZOMBIE_SPEEDS[z.type] ?? ZOMBIE_SPEEDS[0];
   // Perdido: en cualquier estado, si hace 40 s que no se acerca a nadie, se lo recicla.
   for (const p of state.players) {
-    if (p.connected && p.alive && Math.hypot(p.x - z.x, p.z - z.z) < ENGAGED_RANGE) z.engagedAt = state.tick;
+    if (p.connected && p.alive && Math.hypot(p.x - z.x, p.z - z.z) < ENGAGED_RANGE && Math.abs(p.y - z.y) < 2.5) z.engagedAt = state.tick;
   }
   if (state.tick - z.engagedAt > LOST_TICKS) return false;
   if (z.attackCd > 0) z.attackCd--;
@@ -255,13 +283,13 @@ function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly
       const k = 1 - z.stateTicks / BARRIER_VAULT_TICKS;
       z.x = lerp(b.outside.x, b.inside.x, k);
       z.z = lerp(b.outside.z, b.inside.z, k);
-      z.y = Math.sin(Math.PI * Math.min(1, k)) * 0.9;
+      z.y = (b.y ?? 0) + Math.sin(Math.PI * Math.min(1, k)) * (b.kind === "cell" ? 0.25 : 0.9);
       z.vx = 0;
       z.vy = 0;
       z.vz = 0;
       faceToward(z, b.inside.x, b.inside.z, 0.5);
       if (z.stateTicks <= 0) {
-        z.y = 0;
+        z.y = b.y ?? 0;
         z.onGround = true;
         z.state = Z_HUNT;
         z.repathAt = 0;
@@ -296,7 +324,7 @@ function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly
       const dzT = t.z - z.z;
       const dT = Math.hypot(dxT, dzT);
       // Un caído que es lo único que queda: lo rodean a distancia y esperan, sin pegarle.
-      if (t.down && dT <= ZOMBIE_WAIT_RANGE) {
+      if (t.down && dT <= ZOMBIE_WAIT_RANGE && Math.abs(t.y - z.y) < 1.4) {
         faceToward(z, t.x, t.z, 0.3);
         moveBody(z, 0, 0, 0, false, ZOMBIE_HEIGHT, boxes);
         return true;
@@ -309,7 +337,7 @@ function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly
         return true;
       }
       // Cerca y a la vista: derecho, sin la grilla.
-      const direct = dT < 4 && Math.abs(t.y - z.y) < 1 && segmentClear(z.x, z.y + 1, z.z, t.x, t.y + 1, t.z, boxes);
+      const direct = dT < 4 && Math.abs(t.y - z.y) < 0.5 && walkClear(z.x, z.y, z.z, t.x, t.z, boxes);
       let wx = 0;
       let wz = 0;
       if (direct) {
