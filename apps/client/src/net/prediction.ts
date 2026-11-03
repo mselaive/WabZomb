@@ -127,6 +127,8 @@ export class Predictor {
       s.quickRevives = server.own.quickRevives;
       s.invulnTicks = server.own.invulnTicks;
       s.drinkTicks = server.own.drinkTicks;
+      s.axeCd = server.own.axeCd;
+      s.hasAxe = server.hasAxe;
     }
   }
 

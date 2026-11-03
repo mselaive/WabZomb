@@ -1,18 +1,20 @@
-import { ACT_GRENADE, ACT_NONE, EGG_READY, EGG_FURNACE, EGG_SONG, EGG_SOULS, FALL_DAMAGE_PER_MS, FALL_SAFE_SPEED, MAX_HP, SOUL_RANGE, START_POINTS, TRAIL_LENGTH } from "../constants.js";
+import { ACT_AXE, ACT_GRENADE, ACT_NONE, EGG_BOSS_DEAD, EGG_BOSS_ON, bossHp, ZTYPE_BOSS, EGG_READY, EGG_FURNACE, EGG_SONG, EGG_SOULS, FALL_DAMAGE_PER_MS, FALL_SAFE_SPEED, MAX_HP, SOUL_RANGE, START_POINTS, TRAIL_LENGTH } from "../constants.js";
 import type { Box, GameMap } from "../map/types.js";
 import { M1911 } from "../weapons.js";
-import { applySlotAction, damagePlayer, recordTrail, resolveMelee, resolveShot, shotRewind, stepMelee, stepWeaponState, tryThrow } from "./combat.js";
+import { applySlotAction, damagePlayer, recordTrail, resolveMelee, resolveShot, shotRewind, stepMelee, stepWeaponState, tryThrow, resolveAxe } from "./combat.js";
 import { throwGrenade, stepGrenades } from "./grenade.js";
 import { stepMachines, stepUse } from "./interact.js";
 import { collisionBoxes, stepPlayerMovement } from "./movement.js";
 import { stepPowerUps } from "./powerups.js";
 import { stepPlayerStatus, stepRound } from "./rounds.js";
 import type { GameState, PlayerInput, PlayerState, SimEvent } from "./types.js";
-import { stepZombies } from "./zombies.js";
+import { stepZombies, createZombie } from "./zombies.js";
 
 export function createPlayer(id: number): PlayerState {
   return {
     id,
+    hasAxe: false,
+    axeCd: 0,
     alive: false,
     down: false,
     bleedTicks: 0,
@@ -94,6 +96,12 @@ export function createGameState(): GameState {
     egg: 0,
     eggSouls: 0,
     eggTicks: 0,
+    eggCode: 0,
+    eggDial: 0,
+    breakers: 0,
+    breakerTicks: 0,
+    forgeTicks: 0,
+    forgeBy: -1,
     reachedRound: 0,
     seed: 1,
     mapIndex: 0,
@@ -129,6 +137,8 @@ function stepPlayerInput(state: GameState, p: PlayerState, input: PlayerInput, m
   if (input.act !== ACT_NONE && !p.down) {
     if (input.act === ACT_GRENADE) {
       if (tryThrow(p, acting)) throwGrenade(state, p, events, input.seq);
+    } else if (input.act === ACT_AXE) {
+      if (acting) resolveAxe(state, p, boxes, events);
     } else applySlotAction(p, input.act);
   }
 
@@ -139,6 +149,7 @@ function stepPlayerInput(state: GameState, p: PlayerState, input: PlayerInput, m
   const fired = stepWeaponState(p, input, acting);
   if (!wasReloading && p.reloading) events.push({ t: "reload", byId: p.id, x: p.x, y: p.y, z: p.z });
   if (fired >= 0) resolveShot(state, p, fired, input.seq, shotRewind(state.tick, input.view), boxes, events);
+  if (p.axeCd > 0) p.axeCd--;
 }
 
 /**
@@ -172,14 +183,42 @@ export function step(state: GameState, inputs: ReadonlyMap<number, PlayerInput[]
   for (const p of state.players) if (p.alive) recordTrail(p, state.tick);
 
   stepSouls(state, map, events, eventsBefore);
-  stepSiege(state, events);
+  stepQuestTimers(state, events);
+  stepSiege(state, map, events);
   stepRound(state, map, events);
 }
 
+/** Llaves de corte que se levantan solas, y el horno que termina de templar. */
+function stepQuestTimers(state: GameState, events: SimEvent[]): void {
+  if (state.breakerTicks > 0 && --state.breakerTicks === 0) {
+    state.breakers = 0;
+    events.push({ t: "egg", byId: -1, step: 36 });
+  }
+  if (state.forgeTicks > 0 && --state.forgeTicks === 0) events.push({ t: "egg", byId: state.forgeBy, step: 39 });
+}
+
+/** El alcaide: aparece en el muelle cuando se abre la niebla. */
+function spawnBoss(state: GameState, map: GameMap, events: SimEvent[]): void {
+  const q = map.quest;
+  if (!q) return;
+  const rng = state.rng ?? Math.random;
+  const z = createZombie(state, { zone: 12, x: q.boat.x, y: q.boat.y, z: q.boat.z - 4 }, map, rng);
+  const players = state.players.filter((p) => p.connected).length;
+  z.type = ZTYPE_BOSS;
+  z.hp = z.maxHp = bossHp(state.round.number, players);
+  state.zombies.push(z);
+  state.round.spawned++;
+  state.egg |= EGG_BOSS_ON;
+  events.push({ t: "zombie", what: "rise", id: z.id, x: z.x, y: z.y, z: z.z });
+}
+
 /** El asedio de la fuga: mientras dura no hay descanso entre rondas ni se acaban los zombis. */
-function stepSiege(state: GameState, events: SimEvent[]): void {
-  if (state.eggTicks <= 0) return;
+function stepSiege(state: GameState, map: GameMap, events: SimEvent[]): void {
   const r = state.round;
+  // Mientras el alcaide siga en pie, siguen viniendo.
+  const fighting = (state.egg & EGG_BOSS_ON) !== 0 && (state.egg & EGG_BOSS_DEAD) === 0;
+  if (fighting && r.phase === "live") r.total = Math.max(r.total, r.spawned + 3);
+  if (state.eggTicks <= 0) return;
   if (r.phase !== "live") {
     r.phase = "live";
     r.spawned = 0;
@@ -190,10 +229,10 @@ function stepSiege(state: GameState, events: SimEvent[]): void {
   }
   r.total = Math.max(r.total, r.spawned + 6);
   if (--state.eggTicks > 0) return;
-  // Se abrió la niebla: los que están en pie son los últimos.
-  r.total = r.spawned;
+  // Se abrió la niebla, y con ella viene el alcaide.
   state.egg |= EGG_READY;
   events.push({ t: "egg", byId: -1, step: 32 });
+  spawnBoss(state, map, events);
 }
 
 /**

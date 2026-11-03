@@ -446,6 +446,36 @@ export class UI {
     }
   }
 
+  private lastAxe = "";
+
+  /** El hacha, al lado de las granadas: la tecla, o cuánto falta para que vuelva. */
+  setAxe(has: boolean, cdSeconds: number): void {
+    const text = !has ? "" : cdSeconds > 0 ? `X ⚒ ${cdSeconds}` : "X ⚒";
+    if (text === this.lastAxe) return;
+    this.lastAxe = text;
+    let el = document.getElementById("axeHud");
+    if (!el) {
+      el = document.createElement("span");
+      el.id = "axeHud";
+      el.style.cssText = "margin-left:8px;color:#ffd27a;font-weight:700";
+      $("nades").after(el);
+    }
+    el.textContent = text;
+  }
+
+  /** La línea de objetivo en la tabla (Tab): lo que sigue de la fuga. */
+  setJournal(text: string): void {
+    let el = document.getElementById("sbJournal");
+    if (!el) {
+      el = document.createElement("p");
+      el.id = "sbJournal";
+      el.style.cssText = "margin:10px 0 0;max-width:520px;color:#e8d9a8;font-size:14px;line-height:1.35";
+      this.scoreboard.append(el);
+    }
+    el.textContent = text;
+    el.hidden = text === "";
+  }
+
   /** La ronda, con el número que se agranda al cambiar. */
   setRound(number: number, phase: "intermission" | "live" | "over", total: number, killed: number, alive: number): void {
     const el = $("roundNumber");
@@ -660,6 +690,9 @@ export class UI {
 
   showResult(round: number, standings: SnapStanding[], myId: number, escaped = false): void {
     $("resultTitle").textContent = escaped ? `Escaparon de La Roca, en la ronda ${round}` : `Llegaron a la ronda ${round}`;
+    const epilogue = $("resultEpilogue");
+    epilogue.hidden = !escaped;
+    epilogue.textContent = escaped ? "Detrás de la lancha, el faro se apagó solo. Nadie volvió a contestar en esa frecuencia." : "";
     const mine = standings.find((s) => s[0] === myId);
     $("resultSubtitle").textContent = mine ? `${mine[1]} bajas · ${mine[2]} en la cabeza · ${mine[3]} veces caído · ${mine[4]} revividas` : "";
     const table = document.createElement("table");

@@ -9,7 +9,14 @@ import {
   BOX_SPIN_TICKS,
   BOX_TAKE_TICKS,
   BOX_TEDDY_FREE_USES,
+  AXE_PRICE,
   BOARD_RADIUS,
+  BREAKER_TICKS,
+  EGG_BOSS_DEAD,
+  EGG_BREAKERS,
+  EGG_SAFE,
+  FORGE_TICKS,
+  TICK_RATE,
   EGG_BEACON,
   EGG_BOAT,
   EGG_BOAT_PARTS,
@@ -47,7 +54,7 @@ import {
   WALL_AMMO_FACTOR,
 } from "../constants.js";
 import type { Box, GameMap } from "../map/types.js";
-import { FRAG, KNIFE, SLOT_COUNT, THUNDERGUN, rollBox, weapon, weaponStats } from "../weapons.js";
+import { BRASAS, FRAG, KNIFE, SLOT_COUNT, THUNDERGUN, TRABUCO, rollBox, weapon, weaponStats } from "../weapons.js";
 import { applyPerk, givePoints, revivePlayer, slotLimit, switchTo } from "./combat.js";
 import { hasPerk } from "./movement.js";
 import type { GameState, PlayerInput, PlayerState, SimEvent } from "./types.js";
@@ -263,7 +270,27 @@ function findQuest(state: GameState, p: PlayerState, map: GameMap, near: (x: num
   const e = state.egg;
   const info = (label: string, why: string): Interaction => ({ kind: "quest", id: -1, label, price: 0, ok: false, why, hold: false });
   const act = (id: number, label: string): Interaction => ({ kind: "quest", id, label, price: 0, ok: true, hold: false });
-  if ((e & EGG_BUILT) !== 0 && (e & EGG_KEY) === 0 && near(q.key.x, q.key.z, 2.2, q.key.y)) return act(0, `Agarrar ${q.key.name}`);
+
+  // El hacha, en su caja de vidrio: se compra cuando se quiera.
+  if (near(q.axe.x, q.axe.z, 1.7, q.axe.y) && !p.hasAxe) return { kind: "quest", id: 8, label: `Romper el vidrio: ${q.axe.name}`, price: AXE_PRICE, ok: p.points >= AXE_PRICE, why: p.points < AXE_PRICE ? "No te alcanza" : undefined, hold: false };
+
+  // El horno templa el trabuco, cuando ya escupió el gatillo.
+  if ((e & EGG_FURNACE) !== 0 && near(map.furnace.x, map.furnace.z, USE_RANGE + 0.6, map.furnace.y ?? 0)) {
+    if (state.forgeBy >= 0) {
+      if (state.forgeTicks > 0) return info("El horno", `Templando: faltan ${Math.ceil(state.forgeTicks / TICK_RATE)} s`);
+      if (state.forgeBy === p.id) return act(10, `Sacar el ${weapon(BRASAS).name}`);
+      return info("El horno", "Hay un arma esperando a otro");
+    }
+    if ((p.slots[p.active] ?? -1) === TRABUCO) return act(9, "Meter el trabuco en el horno");
+  }
+
+  // La caja fuerte: tres ruedas, y se elige la que está enfrente.
+  if ((e & EGG_SAFE) === 0 && near(q.safe.x, q.safe.z, 2.4, q.safe.y)) {
+    if ((e & EGG_BUILT) === 0) return info("Una caja fuerte", "No se te ocurre la combinación");
+    const w = wheelAt(q, p.x);
+    return act(20 + w, `Girar la rueda ${"I".repeat(w + 1)}: ${dialDigit(state.eggDial, w)}`);
+  }
+  if ((e & EGG_SAFE) !== 0 && (e & EGG_KEY) === 0 && near(q.key.x, q.key.z, 2.2, q.key.y)) return act(0, `Agarrar ${q.key.name}`);
   if ((e & EGG_KEY) !== 0) {
     for (let i = 0; i < q.parts.length; i++) {
       const part = q.parts[i]!;
@@ -279,21 +306,91 @@ function findQuest(state: GameState, p: PlayerState, map: GameMap, near: (x: num
     }
     if ((e & EGG_BEACON) === 0) return info("La lancha", "Sin el faro no se cruza la niebla");
     if ((e & EGG_READY) === 0) return info("La lancha", "Todavía no se abre la niebla: aguantá");
+    if ((e & EGG_BOSS_DEAD) === 0) return info("La lancha", "El alcaide no deja salir a nadie");
     const missing = state.players.some((o) => o.connected && o.alive && !o.down && Math.hypot(o.x - q.boat.x, o.z - q.boat.z) > BOARD_RADIUS);
     if (missing) return info("Subir a la lancha", "Faltan compañeros");
     return act(7, "Subir a la lancha");
   }
+  // Las llaves de corte: con la lancha lista, las tres en menos de BREAKER_TICKS.
+  if ((e & EGG_BOAT) !== 0 && (e & EGG_BREAKERS) === 0) {
+    for (let i = 0; i < q.breakers.length; i++) {
+      const b = q.breakers[i]!;
+      if (!near(b.x, b.z, 1.8, b.y)) continue;
+      if ((state.breakers & (1 << i)) !== 0) return info(b.name, `Bajada. Quedan ${Math.ceil(state.breakerTicks / TICK_RATE)} s para las otras`);
+      return act(30 + i, `Bajar ${b.name}`);
+    }
+  }
   if ((e & EGG_BEACON) === 0 && near(q.beacon.x, q.beacon.z, USE_RANGE + 0.6, q.beacon.y)) {
     if ((e & EGG_BOAT) === 0) return info("El reflector del faro", "Primero tiene que andar la lancha");
+    if ((e & EGG_BREAKERS) === 0) return info("El reflector del faro", "No tiene corriente: faltan las llaves de corte");
     return act(6, "Prender el faro");
   }
   return null;
 }
 
-function stepQuest(state: GameState, id: number, byId: number, map: GameMap, events: SimEvent[]): void {
+/** Qué rueda de la caja fuerte tiene enfrente quien está parado en `x`. */
+export function wheelAt(q: NonNullable<GameMap["quest"]>, x: number): number {
+  let best = 0;
+  q.safeWheels.forEach((w, i) => {
+    if (Math.abs(w - x) < Math.abs(q.safeWheels[best]! - x)) best = i;
+  });
+  return best;
+}
+
+/** El dígito de una rueda: la primera es la de las centenas. */
+export function dialDigit(dial: number, wheel: number): number {
+  return Math.floor(dial / (wheel === 0 ? 100 : wheel === 1 ? 10 : 1)) % 10;
+}
+
+function stepQuest(state: GameState, p: PlayerState, id: number, byId: number, map: GameMap, events: SimEvent[]): void {
   const q = map.quest;
   if (!q) return;
-  if (id === 0) {
+  if (id >= 20 && id <= 22) {
+    // Una vuelta de la rueda; cuando las tres coinciden, se abre sola.
+    const w = id - 20;
+    const unit = w === 0 ? 100 : w === 1 ? 10 : 1;
+    const digit = dialDigit(state.eggDial, w);
+    state.eggDial += (digit === 9 ? -9 : 1) * unit;
+    events.push({ t: "egg", byId, step: 12 });
+    if (state.eggDial === state.eggCode) {
+      state.egg |= EGG_SAFE;
+      events.push({ t: "egg", byId, step: 11 });
+    }
+  } else if (id >= 30 && id <= 32) {
+    if ((state.breakers & (1 << (id - 30))) !== 0) return;
+    if (state.breakers === 0) state.breakerTicks = BREAKER_TICKS;
+    state.breakers |= 1 << (id - 30);
+    let n = 0;
+    for (let i = 0; i < q.breakers.length; i++) if ((state.breakers & (1 << i)) !== 0) n++;
+    events.push({ t: "egg", byId, step: 35, souls: n });
+    if (n === q.breakers.length) {
+      state.egg |= EGG_BREAKERS;
+      state.breakerTicks = 0;
+      events.push({ t: "egg", byId, step: 37 });
+    }
+  } else if (id === 8) {
+    if (!pay(p, AXE_PRICE)) return;
+    p.hasAxe = true;
+    p.axeCd = 0;
+    events.push({ t: "egg", byId, step: 40 });
+  } else if (id === 9) {
+    // El trabuco se va al horno: la ranura queda vacía, como en el Pack-a-Punch.
+    const slot = p.active;
+    state.forgeTicks = FORGE_TICKS;
+    state.forgeBy = p.id;
+    p.slots[slot] = -1;
+    p.ammo[slot] = 0;
+    p.reserve[slot] = 0;
+    p.pap[slot] = 0;
+    let other = -1;
+    for (let s = 0; s < SLOT_COUNT; s++) if ((p.slots[s] ?? -1) >= 0) other = s;
+    switchTo(p, other >= 0 ? other : slot);
+    events.push({ t: "egg", byId, step: 38 });
+  } else if (id === 10) {
+    giveWeapon(p, BRASAS);
+    state.forgeBy = -1;
+    events.push({ t: "buy", byId, what: "weapon", which: BRASAS });
+  } else if (id === 0) {
     state.egg |= EGG_KEY;
     events.push({ t: "egg", byId, step: 10 });
   } else if (id >= 1 && id <= 4) {
@@ -371,7 +468,7 @@ export function stepUse(state: GameState, p: PlayerState, input: PlayerInput, ma
       return;
     }
     case "quest":
-      stepQuest(state, it.id, p.id, map, events);
+      stepQuest(state, p, it.id, p.id, map, events);
       return;
     case "power":
       state.power = true;

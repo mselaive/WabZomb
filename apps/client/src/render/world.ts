@@ -16,11 +16,13 @@ import {
   TEX_METAL,
   TEX_WOOD,
   BOX_POOL,
+  AXE_PRICE,
   EGG_BEACON,
   EGG_BOAT,
   EGG_BOAT_PARTS,
-  EGG_BUILT,
+  EGG_BREAKERS,
   EGG_KEY,
+  EGG_SAFE,
   EGG_SOULS,
   weapon,
   weaponStats,
@@ -32,8 +34,8 @@ import {
 } from "@wabzomb/shared";
 import { makeAllMaterials, makeChalkTexture, makeLabelTexture, makePuffTexture } from "./textures.js";
 import { RocaArt } from "./roca.js";
-import { buildBoat, buildFurnaceFront, buildPapMachine, buildQuestItem, buildWoodDoor, furnaceEmbers, powerPanelFace, buildPerkCabinet, buildSteelDoor, buildWindowFrame } from "./rocaProps.js";
-import { buildGrenadeMesh, buildWeaponMesh, setWeaponEnvironment } from "./viewmodel.js";
+import { buildBoat, buildBreaker, buildFurnaceFront, buildPapMachine, buildQuestItem, buildSafe, buildWoodDoor, chalkDigit, furnaceEmbers, powerPanelFace, buildPerkCabinet, buildSteelDoor, buildWindowFrame } from "./rocaProps.js";
+import { buildAxeMesh, buildGrenadeMesh, buildWeaponMesh, setWeaponEnvironment } from "./viewmodel.js";
 
 function cylinderGeometry(b: Box): THREE.BufferGeometry {
   const r = Math.min(b.maxX - b.minX, b.maxZ - b.minZ) / 2;
@@ -204,6 +206,11 @@ export class World {
   private furnaceMouth: THREE.Mesh | null = null;
   private furnaceLight: THREE.PointLight | null = null;
   private questItems: THREE.Group[] = [];
+  private safe: ReturnType<typeof buildSafe> | null = null;
+  private dialShown = -1;
+  private breakers: ReturnType<typeof buildBreaker>[] = [];
+  private clues: THREE.Mesh[] = [];
+  private cluesShown = -1;
   private boat: { group: THREE.Group; lamp: THREE.MeshStandardMaterial; engine: THREE.Object3D; baseY: number } | null = null;
   readonly moon: THREE.DirectionalLight;
   private sky: THREE.Mesh | null = null;
@@ -732,15 +739,94 @@ export class World {
     this.propGroup.add(group);
     this.art?.bakeLight(group, q.boat.x, q.boat.y + 2, q.boat.z);
     this.boat = { group, lamp, engine, baseY: group.position.y };
+
+    // La caja fuerte, en la pared de la oficina del alcaide.
+    const safe = buildSafe(this.materials[25]!, q.safeWheels, q.safe.x);
+    safe.group.position.set(q.safe.x, q.safe.y, q.safe.z);
+    this.propGroup.add(safe.group);
+    this.art?.bakeLight(safe.group, q.safe.x, q.safe.y + 1.4, q.safe.z + 1, 0, 0, 1);
+    this.safe = safe;
+    this.dialShown = -1;
+
+    // Las llaves de corte: se ven desde el principio, pero no hacen nada hasta el final.
+    this.breakers = q.breakers.map((b) => {
+      const x = buildBreaker(this.materials[27]!);
+      x.group.position.set(b.x, b.y + b.h, b.z);
+      // Miran hacia la sala: desde la pared hacia donde se para el jugador.
+      x.group.rotation.y = Math.abs(b.x) > 29 ? (b.x > 0 ? Math.PI / 2 : -Math.PI / 2) : Math.PI;
+      this.propGroup.add(x.group);
+      this.art?.bakeLight(x.group, b.x * 0.97, b.y + 1.5, b.z, 0, 1, 0);
+      return x;
+    });
+
+    // El hacha en su caja de vidrio, con el precio.
+    const axeCase = new THREE.Group();
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.92, 0.62), this.materials[26]!);
+    axeCase.add(frame);
+    const axe = buildAxeMesh();
+    axe.scale.setScalar(1.45);
+    axe.position.set(-0.09, -0.03, 0.03);
+    axe.rotation.x = 0.28;
+    axeCase.add(axe);
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.86, 0.56), new THREE.MeshStandardMaterial({ color: 0xa8c0d0, transparent: true, opacity: 0.16, roughness: 0.08 }));
+    glass.position.x = -0.14;
+    axeCase.add(glass);
+    const axeLabel = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTexture(`Hacha de incendios · ${AXE_PRICE}`, "#ffd27a", 512, 30), transparent: true, depthTest: true }));
+    axeLabel.scale.set(2.2, 0.28, 1);
+    axeLabel.position.set(-0.2, 0.68, 0);
+    axeCase.add(axeLabel);
+    axeCase.position.set(q.axe.x + 0.26, q.axe.y + q.axe.h, q.axe.z);
+    this.propGroup.add(axeCase);
+    this.art?.bakeLight(axeCase, q.axe.x - 0.8, q.axe.y + 1.5, q.axe.z);
+    this.clues = [];
+    this.cluesShown = -1;
   }
 
-  private updateQuest(egg: number, map: GameMap): void {
+  /** Los tres números en tiza: aparecen cuando se puede leer la combinación. */
+  private updateClues(map: GameMap, code: number): void {
+    const q = map.quest;
+    if (!q || code === this.cluesShown) return;
+    this.cluesShown = code;
+    for (const c of this.clues) this.propGroup.remove(c);
+    this.clues = [];
+    if (code < 0) return;
+    q.clues.forEach((c, i) => {
+      const digit = Math.floor(code / (i === 0 ? 100 : i === 1 ? 10 : 1)) % 10;
+      const mesh = chalkDigit(i, digit);
+      mesh.position.set(c.x, c.y, c.z);
+      mesh.rotation.y = c.yaw + Math.PI;
+      this.propGroup.add(mesh);
+      this.clues.push(mesh);
+    });
+  }
+
+  private updateQuest(egg: number, map: GameMap, qs: readonly number[]): void {
     const q = map.quest;
     if (!q) return;
     const t = performance.now() / 1000;
+    this.updateClues(map, qs[1] ?? -1);
+    // La caja fuerte: las ruedas marcan lo que dice el servidor, y la puerta se abre.
+    if (this.safe) {
+      const dial = qs[2] ?? 0;
+      if (dial !== this.dialShown) {
+        this.dialShown = dial;
+        this.safe.dials.forEach((d, i) => {
+          const digit = Math.floor(dial / (i === 0 ? 100 : i === 1 ? 10 : 1)) % 10;
+          d.rotation.y = (digit / 10) * Math.PI * 2;
+        });
+      }
+      const open = (egg & EGG_SAFE) !== 0 ? -1.75 : 0;
+      this.safe.door.rotation.y += (open - this.safe.door.rotation.y) * 0.08;
+    }
+    this.breakers.forEach((b, i) => {
+      const down = (egg & EGG_BREAKERS) !== 0 || ((qs[3] ?? 0) & (1 << i)) !== 0;
+      b.lever.rotation.x = down ? 2.3 : 0.5;
+      b.lamp.emissiveIntensity = down ? 3 : (egg & EGG_BOAT) !== 0 ? 0.5 + Math.sin(t * 5) * 0.4 : 0.1;
+      b.lamp.emissive.set(down ? 0x60ff60 : 0xff5a2a);
+    });
     this.questItems.forEach((g, i) => {
       const taken = i === 0 ? (egg & EGG_KEY) !== 0 : (egg & (EGG_BOAT_PARTS[i - 1] ?? 0)) !== 0;
-      const visible = i === 0 ? (egg & EGG_BUILT) !== 0 && !taken : (egg & EGG_KEY) !== 0 && !taken;
+      const visible = i === 0 ? (egg & EGG_SAFE) !== 0 && !taken : (egg & EGG_KEY) !== 0 && !taken;
       g.visible = visible;
       if (!visible) return;
       g.rotation.y = t * 1.1;
@@ -757,9 +843,18 @@ export class World {
     this.art?.setBeacon((egg & EGG_BEACON) !== 0);
   }
 
+  /** La salida de la fuga: la lancha arranca hacia la ciudad. Devuelve dónde está, para la cámara. */
+  sailBoat(dt: number): THREE.Vector3 | null {
+    if (!this.boat) return null;
+    const g = this.boat.group;
+    g.position.z += dt * 7;
+    g.rotation.y += (-Math.PI / 2 - g.rotation.y) * Math.min(1, dt * 0.5);
+    return g.position;
+  }
+
   /** Lo que ya se agarró desaparece. */
-  updateEgg(egg: number, souls = 0): void {
-    if (this.map?.quest) this.updateQuest(egg, this.map);
+  updateEgg(egg: number, souls = 0, qs: readonly number[] = []): void {
+    if (this.map?.quest) this.updateQuest(egg, this.map, qs);
     const bits = [2, 4, 8];
     // El gatillo recién aparece cuando el horno se llenó (bit 32).
     this.partMeshes.forEach((g, i) => (g.visible = (egg & (bits[i] ?? 0)) === 0 && (i !== 2 || (egg & 32) !== 0)));

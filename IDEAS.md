@@ -25,8 +25,10 @@ Lo que hay, lo que quedó en la lista y por qué. Primera versión: 2 de noviemb
 | Gráficos | Mapa de noche con luna y estrellas, lámparas que cambian al prender la luz, tiza en las paredes, máquinas, tablas, zombis de cajas con ojos que brillan | Capturas |
 | Sonido | Generado por código: tiros por clase, gruñidos, tablas, máquinas, rondas, la canción | **No lo escuché**: el navegador de prueba no tiene salida |
 | La Roca | Prisión de 14 zonas y 3 alturas sobre los planos públicos de Alcatraz, zombis que salen de celdas tapiadas | 35 tests (uno recorre el mapa caminando con la física real), un bot con el servidor real y capturas; **sin jugarla a mano con mouse** |
-| Más armas | Trabuco giratorio (diseño propio de un trabuco de seis caños), Thompson, BAR, Winchester 1897, Luger, Garand, Springfield, PPSh; 34 en total, con el haz del trabuco girando en cada tiro | 3 tests + capturas; **sin probar la sensación a mano** |
-| La fuga | Easter egg propio de La Roca: llave, cuatro piezas, lancha, faro, asedio de 2 minutos y final con victoria | 5 tests, uno de punta a punta en la simulación; **sin jugarla entera a mano** |
+| Más armas | Blundergat (diseño propio de un trabuco de seis caños), Thompson, BAR, Winchester 1897, Luger, Garand, Springfield, PPSh; 34 en total, con el haz de la Blundergat girando en cada tiro | 3 tests + capturas; **sin probar la sensación a mano** |
+| La fuga | Easter egg propio de La Roca: caja fuerte con combinación por partida, llave, cuatro piezas, lancha, tres llaves de corte contra reloj, faro, asedio de 2 minutos, el alcaide como jefe y final con victoria | Tests por paso y uno que recorre la cadena entera con las mismas acciones de un jugador; **sin jugarla entera a mano** |
+| Armas especiales | Blundergat de brasas (se templa en el horno), reflector de guardia (haz que quema y frena), hacha de incendios (rebota y vuelve) | Tests y capturas; **sin probar la sensación a mano** |
+| Zombis que no se traban | Medición por zona (`ROCA_QA=1`, roca.qa.test.ts): cuenta dónde se traban y a cuántos hay que reciclar | Pasó de cientos de casos en Galería y calle D a casi ninguno |
 | Producción de La Roca | PBR de Poly Haven (CC0), luz horneada apagada y prendida, celdas instanciadas, mar, bahía, faro, lluvia, relámpagos, ambiente de sonido | Capturas; el sonido nuevo **tampoco lo escuché** |
 
 ## Lo que falta, en orden

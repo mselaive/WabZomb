@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EGG_FURNACE, EGG_SONG, PLAYER_HEIGHT } from "../constants.js";
+import { BREAKER_TICKS, EGG_FURNACE, EGG_SONG, PLAYER_HEIGHT, TICK_RATE } from "../constants.js";
 import { harness } from "../sim/helpers.test-util.js";
 import { findInteraction } from "../sim/interact.js";
 import { collisionBoxes, moveBody, overlapsAny } from "../sim/movement.js";
@@ -187,4 +187,72 @@ describe("recorriendo La Roca a pie", () => {
       expect(Math.abs(r.y - y), `quedó a altura ${r.y.toFixed(2)}`).toBeLessThan(0.6);
     });
   }
+});
+
+describe("lo que no se podía usar", () => {
+  const boxes = collisionBoxes({ doorsOpen: (1 << ROCA.doors.length) - 1 }, ROCA);
+  const bodyAt = (x: number, y: number, z: number) => ({ x, y: y + 0.01, z, vx: 0, vy: 0, vz: 0, yaw: 0, crouch: 0, trail: [] as number[], onGround: true });
+
+  it("la escalera de incendios se sube desde el patio y se llega a la terraza", () => {
+    const b = bodyAt(-54, 0, 14.3);
+    for (let i = 0; i < 260 && b.x < -34; i++) moveBody(b, 1, 0, 4.6, false, PLAYER_HEIGHT, boxes);
+    expect(b.x, "llegó al descanso").toBeGreaterThanOrEqual(-34);
+    expect(b.y).toBeGreaterThan(9.2);
+    // Del descanso, por el hueco del pretil, a la terraza.
+    for (let i = 0; i < 60 && b.z > 11; i++) moveBody(b, 0, -1, 4.6, false, PLAYER_HEIGHT, boxes);
+    expect(b.z, "pasó el pretil").toBeLessThan(11);
+    expect(b.y).toBeGreaterThan(9.2);
+    // Y baja igual.
+    for (let i = 0; i < 60 && b.z < 14.3; i++) moveBody(b, 0, 1, 4.6, false, PLAYER_HEIGHT, boxes);
+    for (let i = 0; i < 260 && b.x > -53; i++) moveBody(b, -1, 0, 4.6, false, PLAYER_HEIGHT, boxes);
+    expect(b.y).toBeLessThan(0.3);
+  });
+
+  it("no hay pared invisible en el medio del patio: se salta sin chocar arriba, y un zombi sube la escalera", () => {
+    const z = bodyAt(-45, 0, 30);
+    expect(overlapsAny(-45, 6.8, 30, PLAYER_HEIGHT, boxes)).toBeNull();
+    void z;
+    const grid = navGridFor(ROCA);
+    const path = findPath(grid, -54, 14.3, -50, 0, 0, 9.3);
+    expect(path).not.toBeNull();
+    expect(path![path!.length - 1]!.y).toBeGreaterThan(9);
+  });
+
+  it("la bajada a la ciudadela se camina desde la calle D hasta el piso de abajo", () => {
+    const b = bodyAt(23, 0, 10.7);
+    for (let i = 0; i < 200 && b.x > 12.5; i++) moveBody(b, -1, 0, 4.6, false, PLAYER_HEIGHT, boxes);
+    expect(b.x).toBeLessThanOrEqual(12.5);
+    expect(b.y).toBeLessThan(-3.9);
+  });
+
+  it("el hueco de esa bajada no está tapado por el piso de arriba", () => {
+    for (const b of ROCA.boxes) {
+      if (!b.decal || b.maxY > 0.1 || b.minY < -0.1) continue;
+      const overlap = b.minX < 20 && b.maxX > 15.6 && b.minZ < 11.4 && b.maxZ > 10;
+      expect(overlap, `un piso tapa el hueco: ${b.minX},${b.minZ}`).toBe(false);
+    }
+  });
+
+  it("solo, corriendo, las tres llaves de corte entran holgadas en sus 45 segundos", () => {
+    const q = ROCA.quest!;
+    const grid = navGridFor(ROCA);
+    let metres = 0;
+    for (let i = 0; i + 1 < q.breakers.length; i++) {
+      const a = q.breakers[i]!;
+      const c = q.breakers[i + 1]!;
+      const offA = Math.abs(a.x) > 29 ? -Math.sign(a.x) * 0.8 : 0;
+      const offC = Math.abs(c.x) > 29 ? -Math.sign(c.x) * 0.8 : 0;
+      const path = findPath(grid, a.x + offA, a.z + (offA ? 0 : 0.8), c.x + offC, c.z + (offC ? 0 : 0.8), a.y, c.y);
+      expect(path, `de ${a.name} a ${c.name}`).not.toBeNull();
+      let x = a.x + offA;
+      let z = a.z + (offA ? 0 : 0.8);
+      for (const n of path!) {
+        metres += Math.hypot(n.x - x, n.z - z);
+        x = n.x;
+        z = n.z;
+      }
+    }
+    // Corriendo se hacen unos 6,6 m/s; se cuenta caminando a 5 para dejar margen.
+    expect(metres / 5).toBeLessThan(BREAKER_TICKS / TICK_RATE - 8);
+  });
 });

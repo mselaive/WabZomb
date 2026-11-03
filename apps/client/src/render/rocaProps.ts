@@ -478,6 +478,91 @@ export function buildQuestItem(kind: number, puff: THREE.Texture, brass: THREE.M
   return g;
 }
 
+/** La caja fuerte del alcaide: un frente de acero con tres ruedas. `door` se abre al dar con la combinación. */
+export function buildSafe(steel: THREE.Material, wheels: number[], centerX: number): { group: THREE.Group; door: THREE.Group; dials: THREE.Mesh[] } {
+  const g = new THREE.Group();
+  const dark = new THREE.MeshStandardMaterial({ color: 0x0c0d0f, roughness: 0.8 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0xa8843c, metalness: 0.85, roughness: 0.35 });
+  const back = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.05, 0.16), dark);
+  back.position.set(0, 1.3, 0.03);
+  g.add(back);
+  // Adentro: dos estantes de chapa.
+  for (const y of [1.04, 1.56]) {
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.12, 0.025, 0.1), steel);
+    shelf.position.set(0, y, -0.03);
+    g.add(shelf);
+  }
+  // La puerta gira sobre su bisagra de la izquierda.
+  const door = new THREE.Group();
+  door.position.set(-1.12, 1.3, -0.08);
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(2.24, 1.0, 0.08), steel);
+  plate.position.x = 1.12;
+  door.add(plate);
+  const dials: THREE.Mesh[] = [];
+  for (const wx of wheels) {
+    const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.06, 18), brass);
+    dial.rotation.x = Math.PI / 2;
+    dial.position.set(wx - centerX + 1.12, 0, -0.07);
+    door.add(dial);
+    dials.push(dial);
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.08, 0.012), dark);
+    mark.position.set(0, 0.04, 0.0);
+    mark.position.y = 0.032;
+    mark.rotation.x = Math.PI / 2;
+    mark.position.z = 0.11;
+    dial.add(mark);
+  }
+  g.add(door);
+  return { group: g, door, dials };
+}
+
+/** Un número en la pared, en tiza. Las rayas de arriba dicen qué rueda es. */
+export function chalkDigit(order: number, digit: number): THREE.Mesh {
+  const tex = canvasTexture(256, 256, (ctx) => {
+    ctx.clearRect(0, 0, 256, 256);
+    ctx.fillStyle = "rgba(232,228,214,0.92)";
+    ctx.strokeStyle = "rgba(232,228,214,0.92)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 150px Rajdhani, ui-sans-serif, sans-serif";
+    ctx.fillText(String(digit), 128, 150);
+    ctx.lineWidth = 12;
+    for (let i = 0; i <= order; i++) {
+      const x = 128 + (i - order / 2) * 34;
+      ctx.beginPath();
+      ctx.moveTo(x, 18);
+      ctx.lineTo(x + 4, 66);
+      ctx.stroke();
+    }
+    // Se ve vieja: se come pedazos.
+    ctx.globalCompositeOperation = "destination-out";
+    for (let i = 0; i < 500; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${0.2 + Math.random() * 0.7})`;
+      ctx.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 5, 1 + Math.random() * 3);
+    }
+  });
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(0.62, 0.62),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
+  );
+}
+
+/** Una llave de corte en la pared: tablero y palanca. La palanca es lo que se mueve. */
+export function buildBreaker(steel: THREE.Material): { group: THREE.Group; lever: THREE.Mesh; lamp: THREE.MeshStandardMaterial } {
+  const g = new THREE.Group();
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.74, 0.1), steel);
+  g.add(panel);
+  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.34, 0.05), new THREE.MeshStandardMaterial({ color: 0x8a1a12, roughness: 0.5 }));
+  lever.geometry.translate(0, 0.15, 0);
+  lever.position.set(0, -0.04, -0.09);
+  g.add(lever);
+  const lamp = new THREE.MeshStandardMaterial({ color: 0x151008, emissive: 0xff5a2a, emissiveIntensity: 0.1 });
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), lamp);
+  bulb.position.set(0.16, 0.28, -0.06);
+  g.add(bulb);
+  return { group: g, lever, lamp };
+}
+
 /** Un cartel pintado a plantilla en la pared. */
 export function stencil(text: string, width: number, color = "rgba(30,28,24,0.82)", size = 120): THREE.Mesh {
   const w = 1024;

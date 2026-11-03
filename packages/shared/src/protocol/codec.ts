@@ -8,6 +8,7 @@ import {
   FLAG_RELOADING,
   FLAG_SCOPED,
   FLAG_SELF_REVIVE,
+  FLAG_HAS_AXE,
   FLAG_SHOOT_HELD,
   FLAG_USE_HELD,
   SP_ACTIVE,
@@ -94,6 +95,7 @@ export function packPlayer(p: PlayerState, own: boolean): SnapPlayer {
   if (p.shootHeld) flags |= FLAG_SHOOT_HELD;
   if (p.useHeld) flags |= FLAG_USE_HELD;
   if (p.selfRevive) flags |= FLAG_SELF_REVIVE;
+  if (p.hasAxe) flags |= FLAG_HAS_AXE;
   const out: SnapPlayer = [
     p.id,
     Math.round(p.x * P),
@@ -135,6 +137,7 @@ export function packPlayer(p: PlayerState, own: boolean): SnapPlayer {
       p.quickRevives,
       p.invulnTicks,
       p.drinkTicks,
+      p.axeCd,
     );
   }
   return out;
@@ -158,6 +161,7 @@ export interface UnpackedPlayer {
   shootHeld: boolean;
   useHeld: boolean;
   selfRevive: boolean;
+  hasAxe: boolean;
   /** Id del arma en la mano, o -1. */
   weapon: number;
   slots: [number, number, number];
@@ -186,6 +190,7 @@ export interface UnpackedPlayer {
     quickRevives: number;
     invulnTicks: number;
     drinkTicks: number;
+    axeCd: number;
   } | null;
 }
 
@@ -217,6 +222,7 @@ export function unpackPlayer(t: SnapPlayer): UnpackedPlayer {
           quickRevives: t[SP_OWN + 15] ?? 0,
           invulnTicks: t[SP_OWN + 16] ?? 0,
           drinkTicks: t[SP_OWN + 17] ?? 0,
+          axeCd: t[SP_OWN + 18] ?? 0,
         }
       : null;
   return {
@@ -237,6 +243,7 @@ export function unpackPlayer(t: SnapPlayer): UnpackedPlayer {
     shootHeld: (flags & FLAG_SHOOT_HELD) !== 0,
     useHeld: (flags & FLAG_USE_HELD) !== 0,
     selfRevive: (flags & FLAG_SELF_REVIVE) !== 0,
+    hasAxe: (flags & FLAG_HAS_AXE) !== 0,
     weapon,
     slots,
     active,

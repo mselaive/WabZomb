@@ -1,3 +1,5 @@
+import { AXE_CHAIN, AXE_COOLDOWN_TICKS, AXE_COS, AXE_HOP, AXE_RANGE, BEAM_BOSS_TICK, BEAM_COS, BEAM_DAMAGE, BOSS_HIT_CAP, EGG_BOSS_DEAD, ZTYPE_BOSS, axeDamage } from "../constants.js";
+import { AXE_WEAPON, BRASAS } from "../weapons.js";
 import {
   ACT_SLOT_0,
   ACT_SLOT_2,
@@ -332,13 +334,17 @@ export function resolveShot(state: GameState, shooter: PlayerState, wid: number,
         const cos = (dx * d.x + dy * d.y + dz * d.z) / dist;
         if (cos < THUNDER_COS) continue;
         if (!segmentClear(ox, oy, oz, zb.x, zb.y + ZOMBIE_HEIGHT * 0.5, zb.z, boxes)) continue;
-        damageZombie(state, zb, shooter, zb.hp, ZONE_BODY, wid, zb.x, zb.y + 1, zb.z, events);
+        damageZombie(state, zb, shooter, zb.type === ZTYPE_BOSS ? BOSS_HIT_CAP : zb.hp, ZONE_BODY, wid, zb.x, zb.y + 1, zb.z, events);
       }
       continue;
     }
+    if (stats.beam > 0) {
+      resolveBeam(state, shooter, wid, stats.beam, ox, oy, oz, d, boxes, events);
+      continue;
+    }
     if (stats.explosive > 0 && kind !== HIT_NONE) {
-      // Estalla ahí: a todos los que estén cerca (el que disparó también, un poco).
-      explodeAt(state, shooter, ex, ey, ez, stats.explosive, stats.damage * doubleTap, wid, boxes, events, target);
+      // Estalla ahí: a todos los que estén cerca (el que disparó también, un poco; con las brasas, nada: son muchos perdigones).
+      explodeAt(state, shooter, ex, ey, ez, stats.explosive, stats.damage * doubleTap, wid, boxes, events, target, wid === BRASAS ? 0 : 30);
       continue;
     }
     if (target) {
@@ -417,7 +423,7 @@ export function resolveMelee(state: GameState, p: PlayerState, seq: number, even
 }
 
 export function damageZombie(state: GameState, z: ZombieState, by: PlayerState, dmg: number, zone: number, wid: number, x: number, y: number, zz: number, events: SimEvent[]): void {
-  if (state.instaKill > 0) dmg = z.hp;
+  if (state.instaKill > 0) dmg = z.type === ZTYPE_BOSS ? Math.max(dmg, BOSS_HIT_CAP) : z.hp;
   const applied = Math.min(dmg, z.hp);
   z.hp -= applied;
   events.push({ t: "zhit", zombieId: z.id, byId: by.id, amount: applied, zone, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, z: Math.round(zz * 100) / 100 });
@@ -428,10 +434,91 @@ export function damageZombie(state: GameState, z: ZombieState, by: PlayerState, 
   killZombie(state, z, by, wid, zone === ZONE_HEAD, events);
 }
 
+/** El reflector: un tick de haz. Saca una parte de la vida de cada uno, y los frena. Sin marcador ni puntos por tick: los puntos son por la baja. */
+function resolveBeam(state: GameState, shooter: PlayerState, wid: number, range: number, ox: number, oy: number, oz: number, d: { x: number; y: number; z: number }, boxes: readonly Box[], events: SimEvent[]): void {
+  for (const zb of state.zombies.slice()) {
+    const dx = zb.x - ox;
+    const dy = zb.y + ZOMBIE_HEIGHT * 0.55 - oy;
+    const dz = zb.z - oz;
+    const dist = Math.hypot(dx, dy, dz);
+    if (dist > range || dist < 0.01) continue;
+    if ((dx * d.x + dy * d.y + dz * d.z) / dist < BEAM_COS) continue;
+    if (!segmentClear(ox, oy, oz, zb.x, zb.y + ZOMBIE_HEIGHT * 0.55, zb.z, boxes)) continue;
+    zb.slowTicks = 8;
+    zb.hp -= zb.type === ZTYPE_BOSS ? BEAM_BOSS_TICK : Math.max(4, Math.ceil(zb.maxHp * BEAM_DAMAGE));
+    if (state.tick % 8 === 0) events.push({ t: "zhit", zombieId: zb.id, byId: shooter.id, amount: 0, zone: ZONE_BODY, x: Math.round(zb.x * 100) / 100, y: Math.round((zb.y + 1) * 100) / 100, z: Math.round(zb.z * 100) / 100 });
+    if (zb.hp <= 0) killZombie(state, zb, shooter, wid, false, events);
+  }
+}
+
+/**
+ * El hacha: sale hacia donde se mira, le pega al primero que encuentra en un cono
+ * y salta al más cercano de los que siguen, hasta AXE_CHAIN. Después vuelve sola.
+ */
+export function resolveAxe(state: GameState, p: PlayerState, boxes: readonly Box[], events: SimEvent[]): void {
+  if (!p.hasAxe || p.axeCd > 0 || !p.alive || p.down || p.reloading || p.meleeCd > 0) return;
+  p.axeCd = AXE_COOLDOWN_TICKS;
+  p.fireCd = Math.max(p.fireCd, 8);
+  const d = viewDir(p.yaw, p.pitch, { x: 0, y: 0, z: 0 });
+  const ox = p.x;
+  const oy = p.y + eyeHeightOf(p);
+  const oz = p.z;
+  const round2 = (v: number) => Math.round(v * 100) / 100;
+  const path: number[] = [round2(ox), round2(oy), round2(oz)];
+  // El primero: el más derecho de los que están a la vista.
+  let current: ZombieState | null = null;
+  let best = -1;
+  for (const z of state.zombies) {
+    const dx = z.x - ox;
+    const dy = z.y + 1.1 - oy;
+    const dz = z.z - oz;
+    const dist = Math.hypot(dx, dy, dz);
+    if (dist > AXE_RANGE || dist < 0.01) continue;
+    const c = (dx * d.x + dy * d.y + dz * d.z) / dist;
+    if (c < AXE_COS || c <= best || !segmentClear(ox, oy, oz, z.x, z.y + 1.1, z.z, boxes)) continue;
+    best = c;
+    current = z;
+  }
+  const dmg = axeDamage(state.round.number);
+  const hit = new Set<number>();
+  for (let n = 0; current && n < AXE_CHAIN; n++) {
+    const from: ZombieState = current;
+    hit.add(from.id);
+    const fx = from.x;
+    const fy = from.y;
+    const fz = from.z;
+    path.push(round2(fx), round2(fy + 1.1), round2(fz));
+    damageZombie(state, from, p, from.type === ZTYPE_BOSS ? dmg : Math.max(dmg, Math.ceil(from.maxHp * 0.6)), ZONE_BODY, AXE_WEAPON, fx, fy + 1.1, fz, events);
+    let next: ZombieState | null = null;
+    let near = AXE_HOP;
+    for (const z of state.zombies) {
+      if (hit.has(z.id)) continue;
+      const dist = Math.hypot(z.x - fx, z.y - fy, z.z - fz);
+      if (dist >= near || !segmentClear(fx, fy + 1.1, fz, z.x, z.y + 1.1, z.z, boxes)) continue;
+      near = dist;
+      next = z;
+    }
+    current = next;
+  }
+  // Sin nadie: va derecho hasta lo que haya adelante y vuelve.
+  if (path.length === 3) {
+    const t = raycastBoxes(ox, oy, oz, d.x, d.y, d.z, boxes, AXE_RANGE);
+    const far = t < 0 ? AXE_RANGE : t;
+    path.push(round2(ox + d.x * far), round2(oy + d.y * far), round2(oz + d.z * far));
+  }
+  events.push({ t: "axe", byId: p.id, path });
+}
+
 export function killZombie(state: GameState, z: ZombieState, by: PlayerState | null, wid: number, headshot: boolean, events: SimEvent[]): void {
   const idx = state.zombies.indexOf(z);
   if (idx >= 0) state.zombies.splice(idx, 1);
   state.round.killed++;
+  if (z.type === ZTYPE_BOSS) {
+    // Cayó el alcaide: ya no vienen más, y se puede subir a la lancha.
+    state.egg |= EGG_BOSS_DEAD;
+    state.round.total = state.round.spawned;
+    events.push({ t: "egg", byId: by?.id ?? -1, step: 34 });
+  }
   if (by) {
     by.kills++;
     if (headshot) by.headshots++;

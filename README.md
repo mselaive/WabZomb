@@ -156,10 +156,11 @@ que se lleva a todos los zombis que tenga adelante, 2 tiros por cargador. Mejora
 Cannon**. Dónde está cada cosa, no lo dice el README.
 
 En La Roca sigue: **la fuga**, una historia propia contada en las grabaciones de un médico de la
-prisión. Con la Thunder Gun armada aparece una llave; con la llave se juntan las piezas de una
-lancha; con la lancha lista hay que prender el faro, que hasta ese momento está apagado, y aguantar
-dos minutos de asedio sin descanso hasta que se abra la niebla. Si todos los que están de pie llegan
-a la lancha, escapan y termina la partida.
+prisión: una caja fuerte con la combinación en tiza, las piezas de una lancha, tres llaves de corte
+contra reloj, un faro que recién se prende al final, dos minutos de asedio, el alcaide y, si todos
+llegan, la salida en lancha. También hay armas especiales: la Blundergat, que se puede templar
+en el horno, el reflector de guardia y el hacha de incendios. El paso a paso, con todos los spoilers,
+está en [GUIA_EASTER_EGG.md](GUIA_EASTER_EGG.md). Dentro del juego, Tab muestra lo que sigue.
 
 ## Cómo está hecho
 

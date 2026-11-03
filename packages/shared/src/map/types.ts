@@ -148,6 +148,8 @@ export interface GameMap {
   art?: MapArt;
   /** El easter egg largo, si el mapa lo tiene. */
   quest?: Quest;
+  /** Desde qué altura se tiran los zombis para bajar (sin esto, MAX_DROP de la grilla). */
+  maxDrop?: number;
 }
 
 /** Un objeto de la fuga: dónde se para el jugador (`y`, el piso) y a qué altura flota el objeto (`h`). */
@@ -165,6 +167,15 @@ export interface Quest {
   parts: QuestItem[];
   boat: QuestItem;
   beacon: QuestItem;
+  /** La caja fuerte del alcaide: tres ruedas a lo largo de X. */
+  safe: QuestItem;
+  safeWheels: number[];
+  /** Dónde están pintados los tres números. */
+  clues: { x: number; y: number; z: number; yaw: number }[];
+  /** Las tres llaves de corte. */
+  breakers: QuestItem[];
+  /** El hacha, en su caja de vidrio. */
+  axe: QuestItem;
   notes: {
     radios: string[];
     /** Núcleo, bobina, gatillo, Thunder Gun armada. */
@@ -174,6 +185,10 @@ export interface Quest {
     boat: string;
     beacon: string;
     ready: string;
+    safeHint: string;
+    breakers: string;
+    breakersFail: string;
+    bossDown: string;
   };
 }
 

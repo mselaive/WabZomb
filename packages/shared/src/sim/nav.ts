@@ -19,6 +19,7 @@ export interface NavGrid {
   nodeCell: Int32Array;
   walk: Uint8Array;
   floor: Float32Array;
+  maxDrop: number;
 }
 
 const MAX_DROP = 3.6;
@@ -99,6 +100,7 @@ export function buildNavGrid(map: GameMap, cell = 0.5): NavGrid {
     nodeCell: Int32Array.from(cellOfNode),
     walk: new Uint8Array(cells),
     floor: new Float32Array(cells).fill(NaN),
+    maxDrop: map.maxDrop ?? MAX_DROP,
   };
 
   // Sólo lo que se alcanza desde los spawns de los jugadores (con todas las
@@ -244,7 +246,7 @@ function forEachNeighbor(g: NavGrid, a: number, fn: (b: number, cost: number) =>
         const sideB = nodeFrom(g, (r + dr) * g.cols + c, from, STEP_HEIGHT);
         if (sideA < 0 || sideB < 0 || blocked?.has(sideA) || blocked?.has(sideB)) continue;
       }
-      const b = nodeFrom(g, ncell, from, MAX_DROP);
+      const b = nodeFrom(g, ncell, from, g.maxDrop);
       if (b < 0 || blocked?.has(b)) continue;
       const drop = from - g.nodeFloor[b]!;
       fn(b, (diagonal ? 1.41 : 1) + (drop > STEP_HEIGHT + 0.01 ? DROP_COST : 0));

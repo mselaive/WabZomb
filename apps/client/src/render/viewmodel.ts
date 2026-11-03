@@ -19,8 +19,8 @@ interface Mat {
 const STEEL: Mat = { color: 0x3c424a, metal: 0.75, rough: 0.4 };
 const STEEL_LIGHT: Mat = { color: 0x6c747e, metal: 0.8, rough: 0.35 };
 const GLASS: Mat = { color: 0x7fb0ff, metal: 0.2, rough: 0.1 };
-const SKIN: Mat = { color: 0xd9a877, metal: 0, rough: 0.9 };
-const SLEEVE: Mat = { color: 0x4a4038, metal: 0, rough: 0.95 };
+const SKIN: Mat = { color: 0x2b2b30, metal: 0, rough: 0.9 };
+const SLEEVE: Mat = { color: 0x3b4654, metal: 0, rough: 0.95 };
 const GLOVE: Mat = { color: 0x2a2622, metal: 0, rough: 0.9 };
 /** El Pack-a-Punch pinta el arma de un violeta oscuro con vetas que brillan. */
 const PAP_BODY: Mat = { color: 0x2d1f4a, metal: 0.6, rough: 0.35, emissive: 0x120a26 };
@@ -351,7 +351,7 @@ function trabuco(g: THREE.Group, look: WeaponLook, pap: boolean): void {
   const brass: Mat = pap ? { color: 0x4a2e7a, metal: 0.8, rough: 0.3, emissive: 0x160a30 } : { color: look.color, metal: 0.85, rough: 0.38 };
   const iron: Mat = { color: pap ? 0x20142f : 0x2c2e31, metal: 0.75, rough: 0.45 };
   const wood: Mat = pap ? { color: 0x1c1430, metal: 0.3, rough: 0.6 } : { color: look.wood, metal: 0.05, rough: 0.72 };
-  const glow: Mat = { color: 0xb06cff, emissive: 0x7a3cff, metal: 0.2, rough: 0.3 };
+  const glow: Mat = look.glow ? { color: look.glow, emissive: look.glow, metal: 0.2, rough: 0.4 } : { color: 0xb06cff, emissive: 0x7a3cff, metal: 0.2, rough: 0.3 };
   // Culata y empuñadura.
   box(g, 0.04, 0.066, 0.26, 0, 0.0, 0.2, wood, 0.12);
   box(g, 0.042, 0.09, 0.03, 0, -0.024, 0.33, { ...wood, color: darken(wood.color, 18) }, 0.12);
@@ -385,9 +385,71 @@ function trabuco(g: THREE.Group, look: WeaponLook, pap: boolean): void {
     spin.add(bell);
   }
   // Los aros que atan el haz.
-  for (const z of [-0.03, -len * 0.55, -len + 0.03]) tube(spin, 0.044, 0.012, 0, 0, z, pap ? glow : brass, 18);
+  for (const z of [-0.03, -len * 0.55, -len + 0.03]) tube(spin, 0.044, 0.012, 0, 0, z, pap || look.glow ? glow : brass, 18);
   // La guía de puntería.
   box(g, 0.006, 0.02, 0.008, 0, 0.078, -0.03, iron);
+}
+
+/**
+ * El reflector de guardia: un farol grande de chapa con asa arriba, lente al
+ * frente y un cono de luz (`beam`) que se ve mientras se aprieta el gatillo.
+ */
+function reflector(g: THREE.Group, look: WeaponLook, pap: boolean): void {
+  const body: Mat = pap ? { color: 0x3c2a60, metal: 0.7, rough: 0.35, emissive: 0x120a26 } : { color: look.color, metal: 0.55, rough: 0.5 };
+  const dark: Mat = { color: look.wood, metal: 0.5, rough: 0.6 };
+  const lensMat = new THREE.MeshStandardMaterial({ color: 0x20200c, emissive: look.glow ?? 0xfff0c4, emissiveIntensity: 0.25, roughness: 0.2 });
+  lensMat.name = "lens";
+  box(g, 0.08, 0.1, 0.16, 0, 0.03, -0.02, body);
+  tube(g, 0.075, 0.09, 0, 0.04, -0.14, body, 22);
+  tube(g, 0.086, 0.022, 0, 0.04, -0.19, dark, 22);
+  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.073, 0.073, 0.008, 22), lensMat);
+  lens.rotation.x = Math.PI / 2;
+  lens.position.set(0, 0.04, -0.2);
+  lens.name = "lens";
+  g.add(lens);
+  // El asa de arriba y el botón.
+  box(g, 0.012, 0.05, 0.012, 0, 0.1, 0.03, dark);
+  box(g, 0.012, 0.05, 0.012, 0, 0.1, -0.08, dark);
+  box(g, 0.014, 0.012, 0.13, 0, 0.126, -0.025, dark);
+  box(g, 0.03, 0.09, 0.04, 0, -0.055, 0.02, dark, 0.2);
+  box(g, 0.02, 0.012, 0.03, 0, 0.082, -0.02, { color: 0x7a1a14, rough: 0.5 });
+  // El haz: tres conos aditivos, uno adentro del otro, para que el borde quede
+  // suave. La punta angosta va en la lente; el jugador lo mira casi desde adentro,
+  // así que el brillo depende de la distancia y no del ángulo de la pared.
+  const len = pap ? 22 : 15;
+  const coneMat = new THREE.ShaderMaterial({
+    uniforms: { uLen: { value: len } },
+    vertexShader: `
+      uniform float uLen;
+      varying float vK;
+      void main() {
+        vK = clamp(-position.z / uLen, 0.0, 1.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      varying float vK;
+      void main() {
+        float a = pow(max(0.0, 1.0 - vK), 2.2);
+        gl_FragColor = vec4(vec3(1.0, 0.92, 0.72) * a * 0.07, 1.0);
+      }`,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.FrontSide,
+  });
+  const cone = new THREE.Group();
+  cone.position.set(0, 0.04, -0.2);
+  cone.name = "beam";
+  cone.visible = false;
+  for (const k of [1, 0.68, 0.38]) {
+    const coneGeo = new THREE.CylinderGeometry(0.07, (pap ? 2.4 : 1.7) * k, len, 22, 1, true);
+    coneGeo.rotateX(Math.PI / 2);
+    coneGeo.translate(0, 0, -len / 2);
+    const layer = new THREE.Mesh(coneGeo, coneMat);
+    layer.frustumCulled = false;
+    cone.add(layer);
+  }
+  g.add(cone);
 }
 
 /** La Ray Gun: cuerpo rechoncho, boca redonda y bobinas verdes que brillan. */
@@ -451,6 +513,10 @@ export function buildWeaponMesh(id: number, firstPerson: boolean, pap = false): 
     thunderGun(g, look, pap);
     rightHand = [0, -0.07, 0.06];
     leftHand = [0, -0.02, -0.26];
+  } else if (look.lantern) {
+    reflector(g, look, pap);
+    rightHand = [0, -0.07, 0.02];
+    leftHand = null;
   } else if (look.rotary) {
     trabuco(g, look, pap);
     rightHand = [0, -0.07, 0.075];
@@ -468,7 +534,7 @@ export function buildWeaponMesh(id: number, firstPerson: boolean, pap = false): 
     rightHand = [0, -0.07, 0.04];
     leftHand = [0, -0.005, -look.body / 2 + 0.05 - look.body / 2 - look.barrel * 0.28];
   }
-  if (pap && id !== FRAG && id !== KNIFE && w.cls !== "wonder" && !look.rotary) {
+  if (pap && id !== FRAG && id !== KNIFE && w.cls !== "wonder" && !look.rotary && !look.lantern) {
     // Vetas que brillan a lo largo del cuerpo.
     for (let i = 0; i < 3; i++) box(g, 0.047, 0.004, look.body * 0.8, 0, 0.012 + i * 0.018, -look.body / 2 + 0.05, PAP_GLOW);
   }
@@ -480,7 +546,7 @@ export function buildWeaponMesh(id: number, firstPerson: boolean, pap = false): 
     g.add(rh);
     box(rh, 0.065, 0.075, 0.07, hx + 0.012, hy, hz, GLOVE, 0.2);
     for (let i = 0; i < 4; i++) box(rh, 0.016, 0.014, 0.05, hx - 0.018, hy + 0.024 - i * 0.016, hz - 0.012, GLOVE, 0.2);
-    box(rh, 0.07, 0.07, 0.06, hx + 0.03, hy - 0.04, hz + 0.1, SKIN, 0.3);
+    box(rh, 0.06, 0.062, 0.05, hx + 0.03, hy - 0.04, hz + 0.09, SKIN, 0.3);
     box(rh, 0.075, 0.08, 0.28, hx + 0.03, hy - 0.08, hz + 0.2, SLEEVE, 0.35);
     if (leftHand) {
       const [lx, ly, lz] = leftHand;
@@ -489,7 +555,7 @@ export function buildWeaponMesh(id: number, firstPerson: boolean, pap = false): 
       g.add(lh);
       box(lh, 0.07, 0.06, 0.08, lx - 0.01, ly - 0.03, lz, GLOVE, 0, 0, 0.2);
       for (let i = 0; i < 4; i++) box(lh, 0.014, 0.016, 0.05, lx + 0.028, ly - 0.012, lz - 0.03 + i * 0.016, GLOVE, 0, 0, 0.2);
-      box(lh, 0.07, 0.07, 0.06, lx - 0.06, ly - 0.09, lz + 0.06, SKIN, 0.5, -0.3, 0);
+      box(lh, 0.06, 0.062, 0.05, lx - 0.06, ly - 0.09, lz + 0.06, SKIN, 0.5, -0.3, 0);
       box(lh, 0.075, 0.08, 0.26, lx - 0.12, ly - 0.15, lz + 0.14, SLEEVE, 0.55, -0.35, 0);
     }
   }
@@ -535,6 +601,7 @@ export function muzzleOffset(id: number): THREE.Vector3 {
   const look = w.look;
   if (id === THUNDERGUN) return new THREE.Vector3(0, 0.03, -0.55);
   if (look.rotary) return new THREE.Vector3(0, 0.022, -0.09 - look.barrel - 0.05);
+  if (look.lantern) return new THREE.Vector3(0, 0.04, -0.21);
   if (w.cls === "wonder") return new THREE.Vector3(0, 0.04, -0.33);
   if (w.cls === "pistol") return new THREE.Vector3(0, 0.032, -look.body + 0.03 - look.barrel);
   return new THREE.Vector3(0, 0.05, -look.body / 2 + 0.05 - look.body / 2 - look.barrel);
@@ -548,6 +615,16 @@ function easeOut(t: number): number {
 function smooth(t: number): number {
   const k = Math.max(0, Math.min(1, t));
   return k * k * (3 - 2 * k);
+}
+
+/** Un hacha, para el vuelo y para la caja de vidrio. */
+export function buildAxeMesh(): THREE.Group {
+  const g = new THREE.Group();
+  box(g, 0.03, 0.5, 0.03, 0, 0, 0, { color: 0x7d4b22, rough: 0.7 });
+  box(g, 0.022, 0.15, 0.2, 0, 0.2, -0.05, { color: 0xa52a1c, metal: 0.5, rough: 0.5 });
+  box(g, 0.012, 0.17, 0.05, 0, 0.2, -0.17, { color: 0xc8ccd0, metal: 0.9, rough: 0.28 });
+  box(g, 0.024, 0.06, 0.08, 0, 0.2, 0.07, { color: 0x45494d, metal: 0.8, rough: 0.5 });
+  return g;
 }
 
 /**
@@ -565,6 +642,9 @@ export class ViewModel {
   private slide: THREE.Object3D | null = null;
   private slideHome = new THREE.Vector3();
   private spin: THREE.Object3D | null = null;
+  private beam: THREE.Object3D | null = null;
+  private lens: THREE.MeshStandardMaterial | null = null;
+  private beamT = 0;
   private pump: THREE.Object3D | null = null;
   private pumpHome = new THREE.Vector3();
   private lhand: THREE.Object3D | null = null;
@@ -599,7 +679,7 @@ export class ViewModel {
   private drinkT = 0;
   private readonly drinkTotal = 2.4;
 
-  constructor(camera: THREE.Camera) {
+  constructor(private readonly camera: THREE.Camera) {
     camera.add(this.root);
     this.root.position.set(0.19, -0.15, -0.32);
     this.root.rotation.set(0.05, 0.1, 0.03);
@@ -625,6 +705,9 @@ export class ViewModel {
     this.mag = find("mag", this.magHome);
     this.slide = find("slide", this.slideHome);
     this.spin = this.mesh?.getObjectByName("spin") ?? null;
+    this.beam = this.mesh?.getObjectByName("beam") ?? null;
+    const lensMesh = this.mesh?.getObjectByName("lens") as THREE.Mesh | undefined;
+    this.lens = lensMesh ? (lensMesh.material as THREE.MeshStandardMaterial) : null;
     this.pump = find("pump", this.pumpHome);
     this.lhand = find("lhand", this.lhandHome);
     this.rhand = find("rhand", this.rhandHome);
@@ -723,6 +806,11 @@ export class ViewModel {
     return camera.localToWorld(out);
   }
 
+  /** Mantiene prendido el haz del reflector un rato más. */
+  beamOn(): void {
+    this.beamT = 0.16;
+  }
+
   update(dt: number, speed: number, onGround: boolean, reloading: boolean, reloadSeconds: number, lookDx = 0, lookDy = 0, sprinting = false): void {
     if (this.hidden || !this.mesh) return;
     this.time += dt;
@@ -798,6 +886,18 @@ export class ViewModel {
     }
 
     if (this.slide) this.slide.position.set(this.slideHome.x, this.slideHome.y, this.slideHome.z + 0.035 * Math.max(this.slideT, slideBack));
+    // El reflector: encendido mientras llegan disparos.
+    if (this.beam) {
+      this.beamT = Math.max(0, this.beamT - dt);
+      this.beam.visible = this.beamT > 0;
+      if (this.beam.visible) {
+        // El arma va un poco girada hacia adentro; el haz apunta adonde mira la mira, que es donde pega.
+        const aim = this.camera.localToWorld(new THREE.Vector3(0, 0, -14));
+        const from = this.beam.getWorldPosition(new THREE.Vector3());
+        this.beam.lookAt(from.multiplyScalar(2).sub(aim));
+      }
+      if (this.lens) this.lens.emissiveIntensity = this.beamT > 0 ? 3.4 + Math.sin(this.time * 40) * 0.3 : 0.25;
+    }
     // El haz de caños da un sexto de vuelta por tiro (el tiempo que dura el ciclo del arma).
     if (this.spin && this.cycleT > 0) this.spin.rotation.z += (dt / Math.max(0.05, this.cycleTotal)) * (Math.PI / 3);
     let cycleTilt = 0;

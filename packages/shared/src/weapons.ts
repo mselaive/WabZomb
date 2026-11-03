@@ -36,6 +36,8 @@ export interface WeaponLook {
   glow?: number;
   /** Un haz de caños acampanados que gira (el trabuco). */
   rotary?: boolean;
+  /** Un farol de mano con su lente (el reflector). */
+  lantern?: boolean;
 }
 
 export interface WeaponDef {
@@ -74,6 +76,8 @@ export interface WeaponDef {
   explosive: number;
   /** Un soplido en cono que mata a todos los que agarra (la Thunder Gun): hasta dónde llega, o 0. */
   blast?: number;
+  /** Un haz continuo que quema y frena lo que toca (el reflector): hasta dónde llega, o 0. */
+  beam?: number;
   /** La versión mejorada (Pack-a-Punch). */
   pap: {
     name: string;
@@ -84,6 +88,7 @@ export interface WeaponDef {
     auto?: boolean;
     fireTicks?: number;
     blast?: number;
+    beam?: number;
   };
   look: WeaponLook;
 }
@@ -136,8 +141,14 @@ export const LUGER = 30;
 export const GARAND = 31;
 export const SPRINGFIELD = 32;
 export const PPSH = 33;
+/** Una linterna de guardia de las grandes: quema y frena. La batería es el cargador. */
+export const REFLECTOR = 34;
+/** El trabuco templado en el horno: los perdigones estallan. No sale de la caja. */
+export const BRASAS = 35;
 /** Pseudoarmas de los eventos: caída y manotazo de zombi. */
 export const FALL_WEAPON = 60;
+/** Para los eventos: las bajas con el hacha. */
+export const AXE_WEAPON = 62;
 export const ZOMBIE_WEAPON = 61;
 
 const pistolLook = (color: number, body: number, barrel: number, wood = DARK): WeaponLook => ({ body, barrel, color, wood, mag: "none", magLen: 0, stock: "none" });
@@ -326,7 +337,7 @@ export const WEAPONS: readonly WeaponDef[] = [
     look: { body: 0.36, barrel: 0.3, color: 0x6b6f75, wood: 0x2a2d31, mag: "none", magLen: 0, stock: "poly", glow: 0x9ad0ff },
   }),
   W({
-    id: TRABUCO, name: "Trabuco giratorio", short: "Trabuco", cls: "shotgun", wall: 0, box: 0.5,
+    id: TRABUCO, name: "Blundergat", short: "Blundergat", cls: "shotgun", wall: 0, box: 0.5,
     damage: 55, head: 1.5, range: 0.45, mag: 6, reserve: 60, fireTicks: 7, reloadTicks: 64, drawTicks: 10, auto: false, pellets: 12,
     spread: 0.075, spreadShot: 0.012, spreadMove: 0.03, speed: 4.6, zoom: 0, kick: 0.08, recoilUp: 0.05, recoilSide: 0.015, explosive: 0,
     pap: { name: "El Sepulturero", damage: 120, mag: 12, reserve: 96, fireTicks: 5 },
@@ -381,6 +392,20 @@ export const WEAPONS: readonly WeaponDef[] = [
     pap: { name: "El Enjambre", damage: 85, mag: 142, reserve: 568 },
     look: { body: 0.28, barrel: 0.3, color: DARK, wood: WOOD, mag: "drum", magLen: 0.1, stock: "wood" },
   }),
+  W({
+    id: REFLECTOR, name: "Reflector de guardia", short: "Reflector", cls: "wonder", wall: 0, box: 0.3,
+    damage: 0, head: 1, range: 1, mag: 240, reserve: 480, fireTicks: 1, reloadTicks: 56, drawTicks: 9, auto: true, pellets: 1,
+    spread: 0, spreadShot: 0, spreadMove: 0, speed: 5.0, zoom: 0, kick: 0, recoilUp: 0, recoilSide: 0, explosive: 0, beam: 15,
+    pap: { name: "Sol de Medianoche", damage: 0, mag: 360, reserve: 720, beam: 22 },
+    look: { body: 0.2, barrel: 0, color: 0x3e4a3c, wood: 0x20241f, mag: "none", magLen: 0, stock: "none", lantern: true, glow: 0xfff0c4 },
+  }),
+  W({
+    id: BRASAS, name: "Blundergat de brasas", short: "Brasas", cls: "shotgun", wall: 0, box: 0,
+    damage: 110, head: 1, range: 0.7, mag: 8, reserve: 64, fireTicks: 8, reloadTicks: 60, drawTicks: 10, auto: false, pellets: 8,
+    spread: 0.06, spreadShot: 0.012, spreadMove: 0.03, speed: 4.6, zoom: 0, kick: 0.09, recoilUp: 0.06, recoilSide: 0.015, explosive: 1.1,
+    pap: { name: "El Crematorio", damage: 240, mag: 14, reserve: 112, explosive: 1.6, fireTicks: 6 },
+    look: { body: 0.2, barrel: 0.34, color: 0x6a3a1c, wood: 0x3a2214, mag: "none", magLen: 0, stock: "wood", rotary: true, glow: 0xff7a2a },
+  }),
 ];
 
 export function weapon(id: number): WeaponDef {
@@ -412,11 +437,12 @@ export interface WeaponStats {
   auto: boolean;
   fireTicks: number;
   blast: number;
+  beam: number;
 }
 
 export function weaponStats(id: number, pap: boolean): WeaponStats {
   const w = weapon(id);
-  if (!pap) return { name: w.name, damage: w.damage, mag: w.mag, reserve: w.reserve, explosive: w.explosive, auto: w.auto, fireTicks: w.fireTicks, blast: w.blast ?? 0 };
+  if (!pap) return { name: w.name, damage: w.damage, mag: w.mag, reserve: w.reserve, explosive: w.explosive, auto: w.auto, fireTicks: w.fireTicks, blast: w.blast ?? 0, beam: w.beam ?? 0 };
   return {
     name: w.pap.name,
     damage: w.pap.damage,
@@ -426,6 +452,7 @@ export function weaponStats(id: number, pap: boolean): WeaponStats {
     auto: w.pap.auto ?? w.auto,
     fireTicks: w.pap.fireTicks ?? w.fireTicks,
     blast: w.pap.blast ?? w.blast ?? 0,
+    beam: w.pap.beam ?? w.beam ?? 0,
   };
 }
 

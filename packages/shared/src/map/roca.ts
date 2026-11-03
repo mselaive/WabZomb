@@ -198,6 +198,16 @@ function build(): GameMap {
     }
   };
 
+  /** Macizo e invisible debajo de una escalera de chapas que sube hacia +X, hasta la altura `upTo`. */
+  const underStairs = (x0: number, y0: number, z: number, x1: number, y1: number, width: number, upTo: number) => {
+    const n = Math.ceil(Math.abs(y1 - y0) / 0.19);
+    for (let i = 0; i < n; i++) {
+      const top = y0 + ((y1 - y0) * (i + 1)) / n - 0.1;
+      if (top > upTo || top <= y0) continue;
+      solid(x0 + ((x1 - x0) * i) / n, y0, z - width / 2, x0 + ((x1 - x0) * (i + 1)) / n, top, z + width / 2);
+    }
+  };
+
   /** Una baranda que se ve, y que no se puede saltar. */
   const rail = (x0: number, z0: number, x1: number, z1: number, y: number, h = 2.4) => {
     rails.push({ x0, z0, x1, z1, y });
@@ -262,7 +272,7 @@ function build(): GameMap {
   for (let z = 74; z <= 92; z += 4) for (const x of [18.4, 25, 31.6]) add(x - 0.22, MASS_Y, z - 0.22, x + 0.22, DOCK_Y - 0.5, z + 0.22, TEX_R_PLANKS);
 
   // ---- Los pisos que se ven, cada sala con el suyo.
-  floorDecal(BX0 - 7, -19, 30, 19, 0, TEX_R_FLOOR);
+  for (const r of cut({ x0: BX0 - 7, z0: -19, x1: 30, z1: 19 }, [stairHole])) floorDecal(r.x0, r.z0, r.x1, r.z1, 0, TEX_R_FLOOR);
   floorDecal(-31, -19, BX0 - 0.4, 19, 0.002, TEX_R_FLOORDARK);
   floorDecal(BX1 + 0.4, -19, 30, 19, 0.002, TEX_R_FLOORDARK);
   floorDecal(-60, -13, -31, 13, 0, TEX_R_FLOORDARK);
@@ -393,7 +403,7 @@ function build(): GameMap {
       zone,
       box: bx,
       outside: { x: cx, z: r.z + r.dir * 0.95 },
-      inside: { x: cx, z: r.z - r.dir * 1.35 },
+      inside: { x: cx, z: r.z - r.dir * (tier > 0 ? 0.72 : 1.35) },
       yaw: r.dir > 0 ? Math.PI : 0,
       kind: "cell",
       ...(tier > 0 ? { y: y0 } : {}),
@@ -439,28 +449,27 @@ function build(): GameMap {
   for (const i of [8, 16]) plankCell(rowBS, i, 3, 1);
   for (const i of [3, 13, 21]) plankCell(rowBN, i, 5);
   for (const i of [8, 17]) plankCell(rowA, i, 5);
-  for (const i of [4, 14, 22]) plankCell(rowCS, i, 6);
+  for (const i of [4, 9, 14]) plankCell(rowCS, i, 6);
 
   // ---- Las galerías del segundo piso y los pasarelas del tercero (a ese no se llega).
   const walkway = (x0: number, z0: number, x1: number, z1: number, y: number) => add(x0, y - 0.15, z0, x1, y, z1, TEX_R_TREAD);
   const gy = TIER;
   // Bloque B sobre Broadway: de punta a punta y sigue por arriba de Times Square hasta la escalera del hospital.
-  walkway(-31, -3, BX1, -1.9, gy);
-  rail(-29.4, -1.9, -24.4, -1.9, gy);
-  rail(-24.4, -1.9, -11.9, -1.9, gy);
-  rail(-10.9, -1.9, BX1, -1.9, gy);
+  const gw = 1.65;
+  walkway(-31, -3, BX1, -gw, gy);
+  rail(-29.4, -gw, -12.2, -gw, gy);
+  rail(-10.6, -gw, BX1 - 1.6, -gw, gy);
   rail(-29.4, -3, -24.4, -3, gy);
   // Bloque C sobre Broadway: desde el descanso de la escalera hacia el este.
-  walkway(-18, 1.9, BX1, 3, gy);
-  rail(-18, 1.9, -11.9, 1.9, gy);
-  rail(-10.9, 1.9, BX1, 1.9, gy);
-  rail(-18, 1.9, -18, 2, gy, 0.1);
+  walkway(-18, gw, BX1, 3, gy);
+  rail(-18, gw, -12.2, gw, gy);
+  rail(-10.6, gw, BX1 - 1.6, gw, gy);
   // Puente sobre Broadway, y otro al fondo.
-  walkway(-11.9, -1.9, -10.9, 1.9, gy);
-  rail(-11.9, -1.9, -11.9, 1.9, gy);
-  rail(-10.9, -1.9, -10.9, 1.9, gy);
-  walkway(BX1 - 1.1, -1.9, BX1, 1.9, gy);
-  rail(BX1 - 1.1, -1.9, BX1 - 1.1, 1.9, gy);
+  walkway(-12.2, -gw, -10.6, gw, gy);
+  rail(-12.2, -gw, -12.2, gw, gy);
+  rail(-10.6, -gw, -10.6, gw, gy);
+  walkway(BX1 - 1.6, -gw, BX1, gw, gy);
+  rail(BX1 - 1.6, -gw, BX1 - 1.6, gw, gy);
   add(BX1, gy - 0.15, -3, BX1 + 0.4, gy + 1.1, 3, TEX_R_STEEL);
   clip(BX1, gy + 1.1, -3, BX1 + 0.4, gy + 3, 3);
   // Tercer piso: se ve, no se llega.
@@ -482,13 +491,15 @@ function build(): GameMap {
   }
 
   // La escalera de Broadway: sube hacia el este, del lado del bloque C, hasta el arranque de la galería.
-  const stairZ = 2.45;
-  stairs(-22.8, 0, stairZ, -18, gy, stairZ, 1.1, TEX_R_TREAD);
-  rail(-22.8, 1.9, -18, 1.9, 0, gy + 2.4);
-  door(2, "Reja de la galería", 1000, box(-23.1, 0, 1.9, -22.85, 2.6, 3, TEX_R_STEEL), [0, 3], "bars");
+  const stairZ = (gw + 3) / 2;
+  stairs(-22.8, 0, stairZ, -18, gy, stairZ, 3 - gw, TEX_R_TREAD);
+  rail(-22.8, gw, -18, gw, 0, gy + 2.4);
+  // Abajo de la escalera no se entra: sin esto, los zombis quedaban atrapados contra los escalones.
+  underStairs(-22.8, 0, stairZ, -18, gy, 3 - gw, gy);
+  door(2, "Reja de la galería", 1000, box(-23.1, 0, gw, -22.85, 2.6, 3, TEX_R_STEEL), [0, 3], "bars");
 
   // La escalera del hospital, en Times Square: de la galería sube pegada a la pared oeste.
-  add(-31, gy - 0.15, -3, -29.4, gy, -1.9, TEX_R_TREAD);
+  add(-31, gy - 0.15, -3, -29.4, gy, -gw, TEX_R_TREAD);
   stairs(-30.2, gy, -3, -30.2, HOSP_Y, -6.9, 1.6, TEX_R_TREAD);
   add(-31, HOSP_Y - 0.15, -9.2, -29.4, HOSP_Y, -6.9, TEX_R_TREAD);
   rail(-29.4, -3, -29.4, -9.2, gy, 5.2);
@@ -505,7 +516,8 @@ function build(): GameMap {
   door(7, "Reja de la calle D", 1000, gate(BX1 + 0.2, 9.4, 19), [2, 6], "bars");
   for (const x of [BX0 - 0.2, BX1 + 0.2]) {
     for (const [z0, z1] of [[-3, 3], [-15.4, -9.4], [9.4, x > 0 ? 19 : 15.4]] as const) {
-      add(x - 0.2, 2.62, z0, x + 0.2, 2.86, z1, TEX_R_STEEL);
+      if (z0 !== -3) add(x - 0.2, 2.62, z0, x + 0.2, 2.86, z1, TEX_R_STEEL);
+      else if (x < 0) add(x - 0.2, 2.62, -1.61, x + 0.2, 2.86, z1, TEX_R_STEEL);
       // Las jambas, a los costados de la reja.
       add(x - 0.2, 0, z0 - 0.02, x + 0.2, 2.62, z0 + 0.1, TEX_R_STEEL);
       add(x - 0.2, 0, z1 - 0.1, x + 0.2, 2.62, z1 + 0.02, TEX_R_STEEL);
@@ -520,7 +532,8 @@ function build(): GameMap {
   const hospN = [-35, -45.5, -55].map((x) => highWinX(-13.6, x, HOSP_Y + 1, HOSP_Y + 2.8, 2));
   // Las ventanas del sur dan al patio: sólo reja, para que entre la luna.
   const comedorS = [highWinX(13, -36, 1.3, 4, 2.4), yardDoor, highWinX(13, -55, 1.3, 4, 2.4)];
-  const hospS = [-35, -45.5, -55].map((x) => highWinX(13, x, HOSP_Y + 1, HOSP_Y + 2.8, 2));
+  const hospS: Gap[] = [-39, -45.5, -55].map((x) => highWinX(13, x, HOSP_Y + 1, HOSP_Y + 2.8, 2));
+  hospS.push({ from: -35, to: -33, bottom: TERRACE_Y, top: TERRACE_Y + 1.1 });
   const twoFloors = (axis: "x" | "z", at: number, from: number, to: number, low: Gap[], high: Gap[], outside?: "min" | "max") => {
     if (outside === "min") {
       wall(axis, at, from, to, 0, 5, TEX_R_RAW, low, 0.48);
@@ -661,13 +674,18 @@ function build(): GameMap {
   wall("z", -66.6, 13, 44.6, 0, 6.5, TEX_R_RAW, yardW);
   wall("x", 44, -66.6, -31, 0, 6.5, TEX_R_RAW, yardS);
   wall("z", -31.6, 19.6, 44.6, 0, 6.5, TEX_R_RAW, [road1Gate]);
-  clip(-66.6, 6.5, 13, -31, 12, 44.6);
+  clip(-66.6, 6.5, 13.6, -66, 14, 44.6);
+  clip(-66.6, 6.5, 44, -31.6, 14, 44.6);
+  clip(-31.6, 6.5, 19.6, -31, 14, 44.6);
   door(14, "Portón del camino", 1500, box(-31.6, 0, 30, -31, 2.8, 33, TEX_R_STEEL), [9, 12], "bars");
   // Gradas: subir de a un escalón, los zombis también.
   for (let i = 0; i < 4; i++) {
     const x0 = -66 + i * 1.1;
-    add(x0, 0, 18, x0 + 1.1, 0.4 * (4 - i), 42, TEX_R_RAW);
+    decal(x0, 0, 26.6, x0 + 1.1, 0.4 * (4 - i), 33.4, TEX_R_RAW);
   }
+  // Entre las dos ventanas del oeste: los que entran por ahí tienen que caer en el piso.
+  solid(-66, 0, 26.6, -61.6, 1.6, 33.4);
+  clip(-66, 1.6, 26.6, -61.6, 6.5, 33.4);
   // Una cancha gastada, tachos y cajones.
   floorDecal(-58, 22, -36, 40, 0.014, TEX_R_ASPHALT);
   prop("trash", -34, 0, 42, 2.1, 0.9);
@@ -678,10 +696,10 @@ function build(): GameMap {
   const fireZ = 14.3;
   add(-36, TERRACE_Y - 0.15, 13.6, -33, TERRACE_Y, 15, TEX_R_TREAD);
   add(-35, TERRACE_Y - 0.15, 13, -33, TERRACE_Y, 13.6, TEX_R_TREAD);
-  // El pretil se abre para salir a la escalera.
-  add(-36, TERRACE_Y, 13, -35, TERRACE_Y + 1.1, 13.6, TEX_R_RAW);
   stairs(-36, TERRACE_Y, fireZ, -51, 0, fireZ, 1.4, TEX_R_TREAD);
   rail(-36, 15, -51, 15, 0, TERRACE_Y + 2.4);
+  // Lo mismo abajo de la punta baja de la escalera de incendios.
+  underStairs(-51, 0, fireZ, -36, TERRACE_Y, 1.4, 2.4);
   rail(-33, 15, -36, 15, TERRACE_Y);
   rail(-33, 13.6, -33, 15, TERRACE_Y);
   rail(-33, 13, -33, 13.6, TERRACE_Y);
@@ -700,9 +718,14 @@ function build(): GameMap {
 
   // La bajada: una escalera de piedra hacia el oeste.
   stairs(20.2, 0, 10.7, 14, CITADEL_Y, 10.7, 1.6, TEX_R_STONE, true, CITADEL_Y);
-  rail(15.5, 9.9, 20.2, 9.9, 0);
-  rail(15.5, 11.5, 20.2, 11.5, 0);
-  rail(15.5, 9.9, 15.5, 11.5, 0);
+  // El pretil: a la altura de la cintura, y sin subirse.
+  furn(15.3, 9.7, 20.2, 9.9, 0, 1.05, TEX_R_RAW);
+  furn(15.3, 11.5, 20.2, 11.7, 0, 1.05, TEX_R_RAW);
+  furn(15.3, 9.9, 15.5, 11.5, 0, 1.05, TEX_R_RAW);
+  // El portal de piedra, para que se lea de lejos: jambas, dintel y un farol adentro.
+  add(20.2, 0, 9.5, 20.5, 2.95, 9.9, TEX_R_STONE);
+  add(20.2, 0, 11.5, 20.5, 2.95, 11.9, TEX_R_STONE);
+  add(20.2, 2.6, 9.9, 20.5, 2.95, 11.5, TEX_R_STONE);
   door(13, "Bajada a la ciudadela", 1500, box(20.2, 0, 9.9, 20.45, 2.6, 11.5, TEX_R_STEEL), [6, 13], "bars");
 
   // ---- La ciudadela: piedra, pilares, los calabozos del fuerte viejo, la luz y el horno.
@@ -924,6 +947,8 @@ function build(): GameMap {
   // La ciudadela: faroles cálidos, y el rojo ahí abajo siempre.
   for (const [x, z] of [[-3, 12], [4, 12], [10, 12], [16, 8], [20, 14]] as const) light(x, -1.1, z, 6.5, 11, "grid", 0xffb060, "bulb");
   for (const [x, z] of [[1, 8.6], [13, 17], [22, 9.5]] as const) light(x, -1.2, z, 9, 13, "always", RED, "bulb");
+  // El brillo que sale del pozo de la escalera: es lo que dice "acá se baja".
+  light(16, -1.4, 10.7, 16, 9, "always", 0xff8a3c, "bulb");
   // Lo de afuera: reflectores del patio, del camino y del muelle.
   for (const [x, z] of [[-65.6, 28], [-32, 24], [-50, 43.5], [-32, 40]] as const) light(x, 6, z, 26, 26, "grid", COLD, "seclight", x < -60 ? -Math.PI / 2 : x > -40 ? Math.PI / 2 : 0);
   for (const [x, y, z] of [[0, DOCK_Y + 7, 60], [22, DOCK_Y + 4, 72], [50, DOCK_Y + 7, 60], [25, DOCK_Y + 4.6, 90], [-14, -2, 27], [56.5, 3.4, 22], [51, 3, 4]] as const) {
@@ -1005,9 +1030,10 @@ function build(): GameMap {
     bench: { x: 40, z: 11.5, yaw: 0, zone: 7 },
     furnace: { x: 14, y: cy, z: 17.72, yaw: 0, zone: 13 },
     bounds: { minX: -95, minZ: -45, maxX: 75, maxZ: 96 },
+    maxDrop: 0.5,
     sky: 0x0a1018,
     quest: {
-      key: { name: "la llave del alcaide", x: 40, y: 0, z: -11.5, h: 1.0 },
+      key: { name: "la llave del alcaide", x: 41, y: 0, z: -15.75, h: 1.25 },
       parts: [
         { name: "las bujías", x: -67.2, y: 0, z: -4, h: 1.0 },
         { name: "la hélice", x: -60.9, y: 0, z: 30, h: 0.35 },
@@ -1016,6 +1042,19 @@ function build(): GameMap {
       ],
       boat: { name: "la lancha", x: 10, y: DOCK_Y, z: 71, h: 0 },
       beacon: { name: "el faro", x: 25.4, y: ROOF_Y, z: 0, h: 1.2 },
+      safe: { name: "la caja fuerte", x: 41, y: 0, z: -15.9, h: 1.3 },
+      safeWheels: [40.2, 41, 41.8],
+      clues: [
+        { x: -24 + PITCH * 20.5, y: 1.55, z: -17.93, yaw: Math.PI },
+        { x: 7.6, y: -2.5, z: 6.03, yaw: Math.PI },
+        { x: -59.95, y: 7.4, z: -1.4, yaw: -Math.PI / 2 },
+      ],
+      breakers: [
+        { name: "la llave de Control", x: 29.9, y: 0, z: 11, h: 1.5 },
+        { name: "la llave de Michigan", x: 8, y: 0, z: -15.36, h: 1.5 },
+        { name: "la llave de Times Square", x: -30.92, y: 0, z: 14.5, h: 1.5 },
+      ],
+      axe: { name: "el hacha de incendios", x: -60.9, y: 0, z: 8, h: 1.5 },
       notes: {
         radios: [
           "Grabación del doctor Arrieta, noche 3: el alcaide encerró el núcleo del generador en el armario de medicamentos del hospital. Dice que la música los calma. A los de abajo.",
@@ -1026,13 +1065,17 @@ function build(): GameMap {
           "El núcleo todavía late. Falta la bobina del muelle y lo que escupa el horno.",
           "La bobina está fría. El horno de la ciudadela quiere almas: matá zombis a su lado.",
           "El horno escupió el gatillo. Con las tres piezas, al banco de la armería.",
-          "Arrieta la armó para abrirse paso. No llegó. El alcaide dejó una llave en su escritorio.",
+          "Arrieta la armó para abrirse paso. No llegó. Lo que queda está en la caja fuerte del alcaide, en su oficina.",
         ],
+        safeHint: "Arrieta anotó la combinación en tres lugares, con tiza: en una celda del bloque A, en un calabozo de la ciudadela y en la sala de operaciones. Las rayas dicen el orden.",
+        breakers: "El faro no tiene corriente: hay tres llaves de corte, en Control, en Michigan y en Times Square. Bajada la primera, hay 45 segundos para las otras.",
+        breakersFail: "Se volvieron a levantar. Hay que bajarlas las tres juntas.",
+        bossDown: "El alcaide no se levanta más. La lancha espera.",
         key: "La llave maestra. Abre los depósitos, y la lancha del muelle necesita cuatro cosas: las bujías de la cocina, la hélice del patio, la nafta de la armería y el timón del hospital.",
         part: "Una menos para la lancha.",
-        boat: "La lancha arranca, pero nadie cruza esta niebla a ciegas: hay que prender el faro desde el techo de los bloques.",
+        boat: "La lancha arranca, pero nadie cruza esta niebla a ciegas: hay que prender el faro desde el techo de los bloques, y para eso darle corriente.",
         beacon: "El faro le avisa a toda la isla. Aguantá hasta que se abra la niebla.",
-        ready: "Se abrió la niebla. Todos al muelle: a la lancha.",
+        ready: "Se abrió la niebla, pero algo viene por el muelle. El alcaide no deja salir a nadie.",
       },
     },
     art: { id: "roca", lights, props, cells, rails, ramps, skylights, seaY: -13.5, lighthouse: { x: 63, y: 27.5, z: -27 }, windows },

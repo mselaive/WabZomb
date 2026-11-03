@@ -1,6 +1,7 @@
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
 import {
   ACT_MAX,
+  EGG_BUILT,
   BTN_CROUCH,
   BTN_JUMP,
   BTN_MELEE,
@@ -433,7 +434,7 @@ export class GameRoom extends Server<Env> {
       radios: s.radios,
       egg: s.egg,
       souls: s.eggSouls,
-      siege: s.eggTicks,
+      q: [s.eggTicks, (s.egg & EGG_BUILT) !== 0 ? s.eggCode : -1, s.eggDial, s.breakers, s.breakerTicks, s.forgeTicks, s.forgeBy] as [number, number, number, number, number, number, number],
       st: packStandings(s),
       reached: s.reachedRound,
       ...(this.events.length > 0 ? { ev: this.events } : {}),

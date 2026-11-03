@@ -92,8 +92,8 @@ function patchMaterial(m: THREE.MeshStandardMaterial, opts: { wainscot?: boolean
           float line = (smoothstep(1.38, 1.4, y) - smoothstep(1.46, 1.48, y)) * groundLevel;
           diffuseColor.rgb *= 1.0 - line * 0.55;
           // Chorreaduras: el agua de los tragaluces baja por las paredes.
-          float streak = rocaNoise(vec2((vWPos.x + vWPos.z) * 2.4, y * 0.12));
-          diffuseColor.rgb *= mix(1.0, 0.72, smoothstep(0.62, 0.92, streak) * smoothstep(0.0, 6.0, y));
+          float streak = rocaNoise(vec2((vWPos.x + vWPos.z) * 0.9, y * 0.07)) * rocaNoise(vec2((vWPos.x - vWPos.z) * 3.1, y * 0.18 + 4.0));
+          diffuseColor.rgb *= mix(1.0, 0.84, smoothstep(0.34, 0.68, streak) * smoothstep(1.0, 7.0, y));
           // Mugre a ras del piso.
           diffuseColor.rgb *= mix(0.62, 1.0, smoothstep(0.0, 0.55, y));`
               : ""
@@ -1257,6 +1257,17 @@ export class RocaArt {
     sign("HOSPITAL", 3, -45, 8.1, -2.04, 0, "rgba(40,30,26,0.8)");
     sign("NO PASAR", 2.4, 22, 2, 18.94, Math.PI);
     sign("CIUDADELA  1859", 3, 9, -1.6, 18.94, Math.PI, "rgba(20,18,16,0.75)");
+    // La bajada: el dintel del portal, el pretil y una flecha pintada en el piso.
+    sign("▼ CIUDADELA ▼", 1.5, 20.51, 2.78, 10.7, Math.PI / 2, "rgba(232,226,204,0.9)");
+    sign("▼ CIUDADELA ▼", 1.5, 20.19, 2.78, 10.7, -Math.PI / 2, "rgba(232,226,204,0.9)");
+    sign("ABAJO ▼", 1.3, 17.8, 0.62, 9.69, Math.PI, "rgba(232,226,204,0.8)");
+    sign("ABAJO ▼", 1.3, 17.8, 0.62, 11.71, 0, "rgba(232,226,204,0.8)");
+    {
+      const arrow = stencil("◄ ◄ ◄", 2.2, "rgba(214,180,70,0.72)");
+      arrow.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+      arrow.position.set(22.6, 0.02, 10.7);
+      this.group.add(arrow);
+    }
     sign("CONTROL", 2.6, 29.92, 5.6, 0, -Math.PI / 2);
     sign("ALCAIDE", 2, 40, 3.2, -5.1, Math.PI);
     sign("VISITAS", 2, 40, 3.2, -4.92, 0);

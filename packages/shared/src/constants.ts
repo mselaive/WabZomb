@@ -18,7 +18,7 @@ export const LAG_COMP_MAX_TICKS = 8;
 export const TRAIL_LENGTH = 16;
 
 /** Sube cuando el cliente y el servidor dejan de entenderse (ver el README). */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** Se puede jugar solo. Cuatro, como en el original. */
 export const MIN_PLAYERS = 1;
@@ -115,10 +115,12 @@ export const ZOMBIE_ATTACK_RANGE = 1.35;
 export const ZOMBIE_WINDUP_TICKS = 8;
 export const ZOMBIE_ATTACK_TICKS = 22;
 /** Tipos: caminan, trotan, corren (m/s). */
-export const ZOMBIE_SPEEDS = [1.7, 3.1, 4.7] as const;
+export const ZOMBIE_SPEEDS = [1.7, 3.1, 4.7, 3.5] as const;
 export const ZTYPE_WALK = 0;
 export const ZTYPE_JOG = 1;
 export const ZTYPE_RUN = 2;
+/** El alcaide: el jefe del final de la fuga. Uno solo. */
+export const ZTYPE_BOSS = 3;
 /** Salir del piso tarda esto; mientras, ya se los puede balear. */
 export const ZOMBIE_RISE_TICKS = 30;
 /** Pasar por la ventana sin tablas. */
@@ -264,7 +266,9 @@ export const ACT_SLOT_1 = 2;
 export const ACT_SLOT_2 = 3;
 /** G: tirar una granada. */
 export const ACT_GRENADE = 4;
-export const ACT_MAX = 4;
+/** Tirar el hacha (X). */
+export const ACT_AXE = 5;
+export const ACT_MAX = 5;
 
 /** Zonas de impacto. */
 export const ZONE_HEAD = 0;
@@ -325,6 +329,43 @@ export const ESCAPE_SIEGE_TICKS = 120 * TICK_RATE;
 export const SIEGE_SPAWN_FACTOR = 0.45;
 /** Para subir a la lancha, todos los que estén de pie tienen que estar a esta distancia. */
 export const BOARD_RADIUS = 14;
+/** La caja fuerte del alcaide se abrió: adentro está la llave. */
+export const EGG_SAFE = 32768;
+/** Las tres llaves de corte bajadas a tiempo: el faro tiene corriente. */
+export const EGG_BREAKERS = 65536;
+/** Apareció el alcaide, y ya cayó. */
+export const EGG_BOSS_ON = 131072;
+export const EGG_BOSS_DEAD = 262144;
+/** Una vez bajada la primera llave de corte, cuánto hay para bajar las otras. */
+export const BREAKER_TICKS = 45 * TICK_RATE;
+/** Lo que tarda el horno en templar el trabuco. */
+export const FORGE_TICKS = 25 * TICK_RATE;
+/** Cuánta vida tiene el alcaide. */
+export const BOSS_HP_MIN = 26_000;
+export const BOSS_HP_MAX = 55_000;
+export const BOSS_HP_PER_ROUND = 1500;
+export function bossHp(round: number, players: number): number {
+  // No sigue la curva de los zombis: en rondas altas ninguna munición alcanzaría para matarlo.
+  const solo = Math.min(BOSS_HP_MAX, BOSS_HP_MIN + Math.max(0, round - 10) * BOSS_HP_PER_ROUND);
+  return Math.round(solo * (1 + 0.6 * (Math.max(1, players) - 1)));
+}
+/** Lo máximo que le saca al alcaide un golpe de los que matan de una (el soplido, el Insta-Kill). */
+export const BOSS_HIT_CAP = 1500;
+/** El reflector: cuánto saca por tick, como parte de la vida del zombi, y cuánto frena. */
+export const BEAM_DAMAGE = 0.03;
+export const BEAM_COS = 0.965;
+export const BEAM_SLOW = 0.4;
+export const BEAM_BOSS_TICK = 40;
+/** El hacha: precio, cuánto tarda en volver a la mano, a cuántos alcanza y cuánto daña. */
+export const AXE_PRICE = 2000;
+export const AXE_COOLDOWN_TICKS = 7 * TICK_RATE;
+export const AXE_CHAIN = 5;
+export const AXE_RANGE = 16;
+export const AXE_HOP = 7;
+export const AXE_COS = 0.9;
+export function axeDamage(round: number): number {
+  return 350 + round * 120;
+}
 
 /** La Thunder Gun: hasta dónde llega el soplido y qué tan ancho (coseno del medio ángulo). */
 export const THUNDER_RANGE = 9;

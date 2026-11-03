@@ -38,6 +38,7 @@ const MAX_HOLES = 80;
 export class Effects {
   readonly group = new THREE.Group();
   private tracers: Tracer[] = [];
+  private axes: { mesh: THREE.Object3D; pts: THREE.Vector3[]; leg: number }[] = [];
   private puffs: Puff[] = [];
   private holes: THREE.Mesh[] = [];
   private flashes: Flash[] = [];
@@ -172,7 +173,39 @@ export class Effects {
     this.puffs.push({ sprite, life, total: life, vy, grow });
   }
 
+  /** Un hacha que recorre estos puntos a toda velocidad y vuelve al primero. */
+  axeFlight(mesh: THREE.Object3D, path: number[]): void {
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i + 2 < path.length; i += 3) pts.push(new THREE.Vector3(path[i]!, path[i + 1]!, path[i + 2]!));
+    if (pts.length < 2) return;
+    pts.push(pts[0]!.clone());
+    mesh.position.copy(pts[0]!);
+    this.group.add(mesh);
+    this.axes.push({ mesh, pts, leg: 0 });
+  }
+
   update(dt: number): void {
+    for (let i = this.axes.length - 1; i >= 0; i--) {
+      const a = this.axes[i]!;
+      let left = dt * 30;
+      a.mesh.rotation.x += dt * 22;
+      while (left > 0 && a.leg < a.pts.length - 1) {
+        const to = a.pts[a.leg + 1]!;
+        const d = a.mesh.position.distanceTo(to);
+        if (d <= left) {
+          a.mesh.position.copy(to);
+          left -= d;
+          a.leg++;
+        } else {
+          a.mesh.position.lerp(to, left / d);
+          left = 0;
+        }
+      }
+      if (a.leg >= a.pts.length - 1) {
+        this.group.remove(a.mesh);
+        this.axes.splice(i, 1);
+      }
+    }
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const t = this.tracers[i]!;
       t.life -= dt;

@@ -420,6 +420,39 @@ export class Audio {
     }
   }
 
+  /** La rueda de la caja fuerte: un clic seco. */
+  dialClick(): void {
+    this.tone(1900, 0.03, 0.05, 0, "square", 1300);
+    this.noise(0.03, 3200, 0.05, 0, "highpass");
+  }
+
+  /** Una palanca grande que baja, con el golpe de la corriente. */
+  breaker(): void {
+    this.noise(0.1, 1200, 0.24, 0);
+    this.tone(60, 0.5, 0.2, 0, "sawtooth", 45);
+    this.tone(120, 0.9, 0.05, 0, "square", 118);
+  }
+
+  /** El zumbido del reflector mientras está prendido. */
+  beamHum(): void {
+    this.tone(110, 0.14, 0.03, 0, "sawtooth", 112);
+    this.tone(880, 0.14, 0.006, 0, "sine", 900);
+  }
+
+  /** El hacha que sale silbando. */
+  axeThrow(): void {
+    this.noise(0.22, 1600, 0.16, 0, "bandpass", 3);
+    this.tone(520, 0.2, 0.03, 0, "triangle", 240);
+  }
+
+  /** El alcaide llega: una campana rajada, muy grave. */
+  wardenToll(): void {
+    this.tone(62, 3.4, 0.2, 0, "triangle", 58);
+    this.tone(155, 2.4, 0.06, 0, "sine", 152);
+    this.tone(233, 1.6, 0.04, 0, "sine", 231);
+    this.noise(0.6, 300, 0.1, 0);
+  }
+
   /** La bocina de la lancha, cuando se abre la niebla. */
   boatHorn(): void {
     this.tone(146, 1.6, 0.14, 0, "sawtooth", 142);

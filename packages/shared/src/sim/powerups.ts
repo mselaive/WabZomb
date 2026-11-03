@@ -1,3 +1,4 @@
+import { ZTYPE_BOSS } from "../constants.js";
 import {
   BOARD_MAX,
   CARPENTER_POINTS,
@@ -66,10 +67,12 @@ export function applyPowerUp(state: GameState, kind: number, by: PlayerState, ev
     case POWERUP_NUKE: {
       // Mueren todos los que están: cuentan para la ronda, no para nadie.
       for (const z of state.zombies.slice()) {
+        // El alcaide no se va con una bomba.
+        if (z.type === ZTYPE_BOSS) continue;
         events.push({ t: "zkill", zombieId: z.id, byId: -1, weapon: -1, headshot: false, x: Math.round(z.x * 100) / 100, y: Math.round(z.y * 100) / 100, z: Math.round(z.z * 100) / 100 });
         state.round.killed++;
       }
-      state.zombies = [];
+      state.zombies = state.zombies.filter((z) => z.type === ZTYPE_BOSS);
       for (const p of alive) {
         p.points += state.doublePoints > 0 ? NUKE_POINTS * 2 : NUKE_POINTS;
         events.push({ t: "points", id: p.id, amount: state.doublePoints > 0 ? NUKE_POINTS * 2 : NUKE_POINTS, x: p.x, y: p.y + 1.5, z: p.z });

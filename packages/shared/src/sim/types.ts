@@ -46,6 +46,9 @@ export interface Body {
 
 export interface PlayerState extends Body {
   id: number;
+  /** Tiene el hacha, y cuánto falta para que vuelva a la mano. */
+  hasAxe: boolean;
+  axeCd: number;
   /** En la partida (vivo o caído). Falso: muerto hasta la próxima ronda, o se fue. */
   alive: boolean;
   /** Caído: en el piso, desangrándose, esperando que lo levanten. */
@@ -117,6 +120,8 @@ export const Z_HUNT = 4;
 export const Z_ATTACK = 5;
 
 export interface ZombieState extends Body {
+  /** Frenado por el reflector: ticks que le quedan. */
+  slowTicks: number;
   id: number;
   /** ZTYPE_WALK, ZTYPE_JOG o ZTYPE_RUN. */
   type: number;
@@ -235,6 +240,15 @@ export interface GameState {
   egg: number;
   /** Lo que queda del asedio de la fuga, en ticks (0 si no hay). */
   eggTicks: number;
+  /** La combinación de la caja fuerte y lo que marcan las ruedas (tres dígitos). */
+  eggCode: number;
+  eggDial: number;
+  /** Las llaves de corte bajadas (bits) y lo que queda para bajar las otras. */
+  breakers: number;
+  breakerTicks: number;
+  /** El horno templando el trabuco: cuánto falta, 0 si está listo, y para quién (-1, nada). */
+  forgeTicks: number;
+  forgeBy: number;
   /** Almas juntadas en el horno (zombis muertos cerca), hasta EGG_SOULS. */
   eggSouls: number;
   /** A qué ronda llegaron (cuando termina). */
@@ -288,7 +302,9 @@ export type SimEvent =
   | { t: "melee"; byId: number; seq: number; hit: boolean }
   /** Un zombi que sale del piso, arranca una tabla, o pasa la ventana (para el sonido). */
   | { t: "zombie"; what: "rise" | "tear" | "vault" | "groan"; id: number; x: number; y: number; z: number }
+  /** El hacha: el recorrido, de la mano a cada zombi (x, y, z de cada punto). */
+  | { t: "axe"; byId: number; path: number[] }
   | { t: "radio"; byId: number; which: number; all: boolean }
-  /** El easter egg avanza: una pieza agarrada (0, 1, 2), la Thunder Gun armada (3), un alma más en el horno (4, con `souls`). La fuga: la llave (10), una pieza de la lancha (20 + cuál), lancha arreglada (30), faro (31), niebla abierta (32), escaparon (33). */
+  /** El easter egg avanza: una pieza agarrada (0, 1, 2), la Thunder Gun armada (3), un alma más en el horno (4, con `souls`). La fuga: la llave (10), caja fuerte (11), una rueda (12), una pieza de la lancha (20 + cuál), lancha arreglada (30), faro (31), niebla abierta (32), escaparon (33), alcaide caído (34), llave de corte (35, con `souls` = cuántas), llaves perdidas (36), llaves a tiempo (37), trabuco en el horno (38), trabuco listo (39), hacha comprada (40). */
   | { t: "egg"; byId: number; step: number; souls?: number }
   | { t: "gameover"; round: number };

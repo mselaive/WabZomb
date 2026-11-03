@@ -11,6 +11,8 @@ import {
   ZOMBIE_SPEEDS,
   ZOMBIE_WAIT_RANGE,
   ZOMBIE_WINDUP_TICKS,
+  ZTYPE_BOSS,
+  BEAM_SLOW,
   SIEGE_SPAWN_FACTOR,
   zombieHp,
   zombieSpawnInterval,
@@ -29,6 +31,10 @@ const REPATH_TICKS = 20;
 const STUCK_RESPAWN_TICKS = 160;
 /** Un zombi que lleva esto sin acercarse a nadie (40 s) está trabado en algún rincón: vuelve a la cola y sale por otro lado. */
 const LOST_TICKS = 40 * 20;
+/** A esta distancia de un punto del camino ya se apunta al siguiente. */
+const WAYPOINT_RADIUS = 0.18;
+/** En un mapa grande, sólo los lugares de aparición más cercanos a alguien: los de la otra punta tardan un minuto en llegar. */
+const NEAR_SPAWNERS = 8;
 /** A menos de esto de alguien cuenta como "cerca". */
 const ENGAGED_RANGE = 6;
 
@@ -112,6 +118,16 @@ export function activeSpawners(state: GameState, map: GameMap): Spawner[] {
   }
   let out = map.spawners.filter((s) => open.has(s.zone) && active.has(s.zone));
   if (out.length === 0) out = map.spawners.filter((s) => open.has(s.zone));
+  if (map.art && out.length > NEAR_SPAWNERS) {
+    const people = state.players.filter((p) => p.connected && p.alive);
+    const away = (s: Spawner) => people.reduce((best, p) => Math.min(best, Math.hypot(s.x - p.x, s.z - p.z) + Math.abs(s.y - p.y) * 4), Infinity);
+    const ranked = out.map((s) => ({ s, d: away(s) })).sort((a, b) => a.d - b.d);
+    const reach = Math.max(45, ranked[0]!.d * 2);
+    out = ranked
+      .filter((e, i) => i < 3 || e.d <= reach)
+      .slice(0, NEAR_SPAWNERS)
+      .map((e) => e.s);
+  }
   return out;
 }
 
@@ -146,6 +162,7 @@ export function createZombie(state: GameState, s: Spawner, map: GameMap, rng: ()
     lastX: s.x,
     lastZ: s.z,
     engagedAt: state.tick,
+    slowTicks: 0,
     goalX: b ? b.outside.x : s.x,
     goalZ: b ? b.outside.z : s.z,
   };
@@ -220,12 +237,17 @@ function faceToward(z: ZombieState, x: number, zz: number, k = 0.35): void {
 }
 
 function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly Box[], grid: NavGrid, blocked: ReadonlySet<number>, events: SimEvent[]): boolean {
-  const speed = ZOMBIE_SPEEDS[z.type] ?? ZOMBIE_SPEEDS[0];
+  let speed: number = ZOMBIE_SPEEDS[z.type] ?? ZOMBIE_SPEEDS[0];
+  if (z.slowTicks > 0) {
+    z.slowTicks--;
+    speed *= BEAM_SLOW;
+  }
+  const boss = z.type === ZTYPE_BOSS;
   // Perdido: en cualquier estado, si hace 40 s que no se acerca a nadie, se lo recicla.
   for (const p of state.players) {
     if (p.connected && p.alive && Math.hypot(p.x - z.x, p.z - z.z) < ENGAGED_RANGE && Math.abs(p.y - z.y) < 2.5) z.engagedAt = state.tick;
   }
-  if (state.tick - z.engagedAt > LOST_TICKS) return false;
+  if (!boss && state.tick - z.engagedAt > LOST_TICKS) return false;
   if (z.attackCd > 0) z.attackCd--;
 
   switch (z.state) {
@@ -302,7 +324,7 @@ function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly
       if (t) faceToward(z, t.x, t.z, 0.5);
       if (--z.stateTicks > 0) return true;
       if (t && t.alive && Math.hypot(t.x - z.x, t.z - z.z) <= ZOMBIE_ATTACK_RANGE * 1.3 && Math.abs(t.y - z.y) < 1.4) {
-        damagePlayer(state, t, ZOMBIE_DAMAGE, z.id, events);
+        damagePlayer(state, t, boss ? ZOMBIE_DAMAGE * 2 : ZOMBIE_DAMAGE, z.id, events);
       }
       z.attackCd = ZOMBIE_ATTACK_TICKS;
       z.state = Z_HUNT;
@@ -354,7 +376,7 @@ function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly
             wz = dzT / dT;
           }
         }
-        while (z.path.length > 0 && Math.hypot(z.path[0]!.x - z.x, z.path[0]!.z - z.z) < 0.4 && Math.abs(z.path[0]!.y - z.y) < 1) z.path.shift();
+            while (z.path.length > 0 && Math.hypot(z.path[0]!.x - z.x, z.path[0]!.z - z.z) < WAYPOINT_RADIUS && Math.abs(z.path[0]!.y - z.y) < 1) z.path.shift();
         const next = z.path[0];
         if (next) {
           const dx = next.x - z.x;
@@ -372,18 +394,39 @@ function stepOne(state: GameState, z: ZombieState, map: GameMap, boxes: readonly
       z.lastX = z.x;
       z.lastZ = z.z;
       z.stuck = moved < 0.02 && dT > ZOMBIE_ATTACK_RANGE ? z.stuck + 1 : 0;
-      if (z.stuck === 25) {
+      if (z.stuck > 0 && z.stuck % 15 === 0) {
+        // Se trabó en una esquina: un pasito hacia donde quede libre y más cerca del camino, y a recalcular.
+        const goal = z.path[0];
         z.path = [];
         z.repathAt = 0;
-        // Un empujón de costado por si quedó contra una esquina.
-        const sx = -wz * 0.3;
-        const sz = wx * 0.3;
-        if (!overlapsAny(z.x + sx, z.y, z.z + sz, ZOMBIE_HEIGHT, boxes)) {
-          z.x += sx;
-          z.z += sz;
+        let bestX = 0;
+        let bestZ = 0;
+        let bestD = Infinity;
+        for (const [sx, sz] of [[-wz, wx], [wz, -wx], [-wx, -wz]] as const) {
+          const nx = z.x + sx * 0.3;
+          const nz = z.z + sz * 0.3;
+          if (overlapsAny(nx, z.y, nz, ZOMBIE_HEIGHT, boxes)) continue;
+          const d = goal ? Math.hypot(goal.x - nx, goal.z - nz) : Math.hypot(t.x - nx, t.z - nz);
+          if (d < bestD) {
+            bestD = d;
+            bestX = nx;
+            bestZ = nz;
+          }
+        }
+        if (bestD < Infinity) {
+          z.x = bestX;
+          z.z = bestZ;
         }
       }
-      if (z.stuck > STUCK_RESPAWN_TICKS) return false;
+      if (z.stuck > STUCK_RESPAWN_TICKS) {
+        if (!boss) return false;
+        // El alcaide no se recicla: aparece detrás de quien persigue.
+        z.x = t.x - Math.sin(t.yaw) * -2.5;
+        z.y = t.y;
+        z.z = t.z - Math.cos(t.yaw) * -2.5;
+        z.stuck = 0;
+        z.path = [];
+      }
       return true;
     }
   }

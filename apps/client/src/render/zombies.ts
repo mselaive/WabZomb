@@ -465,6 +465,157 @@ export class ZombieAvatar {
   }
 }
 
+/**
+ * El alcaide: un viejo larguísimo y flaco, de sobretodo gris hasta los tobillos,
+ * sombrero de ala y un farol de luz azul en la mano. Camina derecho, sin apuro.
+ */
+export class WardenAvatar {
+  readonly root = new THREE.Group();
+  private readonly body = new THREE.Group();
+  private readonly head = new THREE.Group();
+  private readonly armL = new THREE.Group();
+  private readonly armR = new THREE.Group();
+  private readonly coat: THREE.Mesh;
+  private walk = 0;
+  private lastX = 0;
+  private lastZ = 0;
+  readonly type: number;
+  groanAt = 0;
+  hp = 1;
+
+  constructor(type: number) {
+    this.type = type;
+    const coat = new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.92, map: canvas(128, 256, (ctx) => {
+      ctx.fillStyle = "#6f7276";
+      ctx.fillRect(0, 0, 128, 256);
+      stain(ctx, 128, 256, 0.3);
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(60, 0, 5, 256);
+    }) });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x14141a, roughness: 0.75 });
+    const skin = new THREE.MeshStandardMaterial({ color: 0xa8a48e, roughness: 0.7 });
+    const eye = new THREE.MeshStandardMaterial({ color: 0x7ad0ff, emissive: 0x7ad0ff, emissiveIntensity: 4 });
+    const blue = new THREE.MeshStandardMaterial({ color: 0x6ab8ff, emissive: 0x6ab8ff, emissiveIntensity: 3.2 });
+    const brass = new THREE.MeshStandardMaterial({ color: 0x8a6a30, metalness: 0.85, roughness: 0.4 });
+    // El sobretodo: un cono largo y angosto, del hombro a los tobillos.
+    this.coat = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.42, 1.62, 14, 3), coat);
+    this.coat.position.y = 0.92;
+    this.coat.scale.z = 0.72;
+    this.root.add(this.coat);
+    // Las botas asomando.
+    for (const x of [-0.13, 0.13]) {
+      const boot = new THREE.Mesh(geo.boot, dark);
+      boot.position.set(x, 0.05, -0.06);
+      this.root.add(boot);
+    }
+    this.body.position.y = 1.72;
+    this.root.add(this.body);
+    const shoulders = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.42, 4, 10), coat);
+    shoulders.rotation.z = Math.PI / 2;
+    shoulders.scale.z = 0.8;
+    this.body.add(shoulders);
+    // El cuello alto, la cara hundida y el sombrero.
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.16, 0.16, 12, 1, true), dark);
+    collar.position.y = 0.14;
+    (collar.material as THREE.Material).side = THREE.DoubleSide;
+    this.body.add(collar);
+    this.head.position.y = 0.24;
+    const skull = new THREE.Mesh(geo.skull, skin);
+    skull.scale.set(0.74, 1.2, 0.84);
+    skull.position.y = 0.1;
+    const sockets = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.05, 0.04), dark);
+    sockets.position.set(0, 0.13, -0.09);
+    const eyeL = new THREE.Mesh(geo.eye, eye);
+    eyeL.position.set(-0.038, 0.13, -0.112);
+    const eyeR = new THREE.Mesh(geo.eye, eye);
+    eyeR.position.set(0.038, 0.13, -0.112);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.02, 18), dark);
+    brim.position.y = 0.2;
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.115, 0.16, 14), dark);
+    crown.position.y = 0.29;
+    this.head.add(skull, sockets, eyeL, eyeR, brim, crown);
+    this.body.add(this.head);
+    // Brazos largos: en la derecha el farol, en la izquierda el llavero.
+    const arm = (g: THREE.Group, x: number) => {
+      g.position.set(x, 0, 0);
+      const upper = new THREE.Mesh(geo.upperArm, coat);
+      upper.position.y = -0.2;
+      upper.scale.y = 1.35;
+      const fore = new THREE.Mesh(geo.foreArm, coat);
+      fore.position.y = -0.58;
+      fore.scale.y = 1.35;
+      const hand = new THREE.Mesh(geo.hand, skin);
+      hand.position.y = -0.82;
+      g.add(upper, fore, hand);
+      this.body.add(g);
+    };
+    arm(this.armR, 0.32);
+    arm(this.armL, -0.32);
+    const lantern = new THREE.Group();
+    lantern.position.set(0, -1.02, 0);
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.16, 10), blue);
+    const top = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.06, 10), brass);
+    top.position.y = 0.11;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.008, 6, 12), brass);
+    ring.position.y = 0.17;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.025, 10), brass);
+    base.position.y = -0.09;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: wardenHalo(), color: 0x6ab8ff, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending }));
+    halo.scale.setScalar(1.5);
+    lantern.add(glass, top, ring, base, halo);
+    this.armR.add(lantern);
+    for (let i = 0; i < 4; i++) {
+      const key = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.08, 0.004), brass);
+      key.position.set(-0.025 + i * 0.016, -0.94, 0);
+      key.rotation.z = -0.4 + i * 0.28;
+      this.armL.add(key);
+    }
+    this.root.add(contactShadow());
+    this.root.scale.setScalar(1.08);
+  }
+
+  update(z: UnpackedZombie, dt: number, now: number): void {
+    this.root.position.set(z.x, z.y, z.z);
+    this.root.rotation.y = z.yaw;
+    this.hp = z.hp;
+    const t = now / 1000;
+    const moved = Math.hypot(z.x - this.lastX, z.z - this.lastZ);
+    this.lastX = z.x;
+    this.lastZ = z.z;
+    this.walk += moved * 3.2;
+    const sway = Math.sin(this.walk);
+    // No camina: se desliza con un balanceo, como si el sobretodo no tuviera piernas.
+    this.coat.rotation.z = sway * 0.035;
+    this.body.rotation.z = -sway * 0.05;
+    this.body.position.y = 1.72 + Math.abs(Math.cos(this.walk)) * 0.03;
+    this.head.rotation.y = Math.sin(t * 0.8) * 0.3;
+    if (z.state === Z_ATTACK) {
+      const k = 1 - z.stateTicks / ZOMBIE_WINDUP_TICKS;
+      const raise = k < 0.65 ? k / 0.65 : 1 - (k - 0.65) / 0.35;
+      this.armL.rotation.x = -0.5 - raise * 2.4;
+      this.armR.rotation.x = -0.9;
+    } else {
+      this.armL.rotation.x = 0.05 + Math.sin(t * 1.1) * 0.05;
+      // El farol siempre adelante, como buscando.
+      this.armR.rotation.x = -0.95 + Math.sin(t * 1.4) * 0.06;
+    }
+    void dt;
+  }
+}
+
+let wardenHaloTex: THREE.Texture | null = null;
+function wardenHalo(): THREE.Texture {
+  wardenHaloTex ??= canvas(64, 64, (ctx) => {
+    const g = ctx.createRadialGradient(32, 32, 1, 32, 32, 31);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.3, "rgba(255,255,255,0.3)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+  });
+  return wardenHaloTex;
+}
+
 /** Un zombi caído donde cayó: se queda un rato y se hunde en el piso. */
 export function buildZombieCorpse(id: number, x: number, y: number, z: number, yaw: number): THREE.Group {
   const m = materialsOf(id % LOOKS.length);

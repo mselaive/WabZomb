@@ -18,8 +18,16 @@ import {
   HIT_WORLD,
   INTERP_DELAY_MS,
   MS_PER_TICK,
+  EGG_BEACON,
+  EGG_BOAT,
   EGG_BOAT_PARTS,
+  EGG_BOSS_DEAD,
+  EGG_BREAKERS,
+  EGG_BUILT,
   EGG_ESCAPED,
+  EGG_KEY,
+  EGG_READY,
+  EGG_SAFE,
   EGG_FURNACE,
   EGG_PART_NAMES,
   EGG_RADIO_NOTES,
@@ -70,6 +78,7 @@ import {
   type UnpackedRound,
   type UnpackedZombie,
   TICK_RATE,
+  ZTYPE_BOSS,
   zoneAt,
 } from "@wabzomb/shared";
 import { Audio } from "./audio.js";
@@ -79,8 +88,9 @@ import { SnapshotBuffer, type InterpolatedFrame } from "./net/interpolation.js";
 import { Predictor, type PredictedShot } from "./net/prediction.js";
 import { Effects } from "./render/effects.js";
 import { PlayerAvatar } from "./render/players.js";
-import { ViewModel, muzzleOffset } from "./render/viewmodel.js";
+import { ViewModel, buildAxeMesh, muzzleOffset } from "./render/viewmodel.js";
 import { Post } from "./render/post.js";
+import { WardenAvatar } from "./render/zombies.js";
 import { World } from "./render/world.js";
 import { ZombieAvatar, buildZombieCorpse } from "./render/zombies.js";
 import type { UI } from "./ui.js";
@@ -94,6 +104,10 @@ export class Game {
   private renderer!: THREE.WebGLRenderer;
   private readonly camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, 3400);
   private post: Post | null = null;
+  private questState: readonly number[] = [];
+  private beamHumAt = 0;
+  /** El final de la fuga: cuándo arrancó la escena de la lancha (0, nada). */
+  private escapeAt = 0;
   /** Se apaga para sacar capturas desde otro lado. */
   lobbyDrift = true;
   private readonly world = new World();
@@ -101,7 +115,7 @@ export class Game {
   private viewModel!: ViewModel;
   private readonly avatars = new Map<number, PlayerAvatar>();
   private readonly avatarGroup = new THREE.Group();
-  private readonly zombieAvatars = new Map<number, ZombieAvatar>();
+  private readonly zombieAvatars = new Map<number, ZombieAvatar | WardenAvatar>();
   private readonly zombieGroup = new THREE.Group();
   private readonly corpseGroup = new THREE.Group();
   private readonly corpses: { mesh: THREE.Group; at: number }[] = [];
@@ -362,6 +376,29 @@ export class Game {
     }
   }
 
+  /** Lo que sigue de la fuga, para la tabla: nada hasta que se la empieza. */
+  private journalText(): string {
+    const q = this.map.quest;
+    if (!q) return "";
+    const e = this.shadow.egg;
+    const r = this.shadow.radios;
+    if ((e & EGG_ESCAPED) !== 0) return "";
+    if (r === 0 && (e & EGG_SONG) === 0) return "";
+    const has = (bit: number) => (e & bit) !== 0;
+    let text: string;
+    if (!has(EGG_SONG)) text = "Hay más radios viejas en la isla.";
+    else if (!has(EGG_BUILT)) text = "El núcleo, la bobina y lo que escupa el horno: al banco de la armería.";
+    else if (!has(EGG_SAFE)) text = "La caja fuerte del alcaide. La combinación está en tiza: bloque A, ciudadela y sala de operaciones.";
+    else if (!has(EGG_KEY)) text = "La llave está en la caja fuerte abierta.";
+    else if (!has(EGG_BOAT)) text = `Las piezas de la lancha: ${q.parts.filter((_, i) => !has(EGG_BOAT_PARTS[i]!)).map((p) => p.name).join(", ") || "ya están: al muelle"}.`;
+    else if (!has(EGG_BREAKERS)) text = "Las tres llaves de corte, en menos de 45 segundos: Control, Michigan y Times Square.";
+    else if (!has(EGG_BEACON)) text = "El faro: desde el techo de los bloques.";
+    else if (!has(EGG_READY)) text = "Aguantar hasta que se abra la niebla.";
+    else if (!has(EGG_BOSS_DEAD)) text = "El alcaide. No se va a ir solo.";
+    else text = "Todos a la lancha.";
+    return `La fuga: ${text}`;
+  }
+
   private mapLoaded = -1;
   private assetsBar: HTMLElement | null = null;
 
@@ -444,8 +481,9 @@ export class Game {
     this.shadow.radios = msg.radios;
     this.shadow.egg = msg.egg;
     this.shadow.eggSouls = msg.souls;
-    this.shadow.eggTicks = msg.siege;
-    this.world.updateEgg(msg.egg, msg.souls);
+    this.shadow.eggTicks = msg.q[0];
+    this.questState = msg.q;
+    this.world.updateEgg(msg.egg, msg.souls, msg.q);
     this.shadow.phase = msg.phase;
     this.shadow.round.number = this.latestRound.number;
     this.world.updateBoards(msg.boards);
@@ -532,7 +570,17 @@ export class Game {
         this.viewModel.setHidden(true);
         this.audio.stopSong();
         this.songOn = false;
-        this.ui.showResult(msg.reached, msg.st, this.myId, (msg.egg & EGG_ESCAPED) !== 0);
+        if ((msg.egg & EGG_ESCAPED) !== 0) {
+          // La lancha se va: se ve desde arriba unos segundos, y recién ahí el resultado.
+          this.escapeAt = performance.now();
+          this.audio.boatHorn();
+          window.setTimeout(() => {
+            if (this.phase === "ended") this.ui.showResult(msg.reached, msg.st, this.myId, true);
+            this.escapeAt = 0;
+          }, 8500);
+        } else {
+          this.ui.showResult(msg.reached, msg.st, this.myId, false);
+        }
         break;
       }
     }
@@ -541,6 +589,11 @@ export class Game {
   private onEvent(ev: SimEvent): void {
     const me = this.predictor?.state;
     switch (ev.t) {
+      case "axe": {
+        if (ev.byId === this.myId) this.audio.axeThrow();
+        this.effects.axeFlight(buildAxeMesh(), ev.path);
+        return;
+      }
       case "shot":
         this.onShotEvent(ev);
         return;
@@ -646,22 +699,62 @@ export class Game {
           const q = this.map.quest;
           const steps = q?.notes.steps ?? EGG_STEP_NOTES;
           if (q && ev.step >= 10) {
+            if (ev.step === 12) {
+              this.audio.dialClick();
+              return;
+            }
+            if (ev.step === 11) {
+              this.audio.door(q.safe.x, q.safe.z);
+              this.ui.showBanner("La caja fuerte se abrió", "gold", 5000, "Adentro está la llave maestra.");
+              return;
+            }
+            if (ev.step === 34) {
+              this.ui.showBanner("El alcaide cayó", "gold", 8000, q.notes.bossDown);
+              return;
+            }
+            if (ev.step === 35) {
+              this.audio.breaker();
+              this.ui.showBanner(`Llave de corte ${ev.souls ?? 1} de ${q.breakers.length}`, "gold", 2500);
+              return;
+            }
+            if (ev.step === 36) {
+              this.ui.showBanner("Se levantaron las llaves", "blood", 5000, q.notes.breakersFail);
+              return;
+            }
+            if (ev.step === 37) {
+              this.audio.breaker();
+              this.ui.showBanner("El faro tiene corriente", "gold", 6000, "Ahora, al techo: prendelo.");
+              return;
+            }
+            if (ev.step === 38) {
+              this.ui.showBanner("La Blundergat se está templando", "gold", 3500, "Va a tardar. Aguantá cerca del horno.");
+              return;
+            }
+            if (ev.step === 39) {
+              this.ui.showBanner("El horno devolvió algo", "gold", 4000, "La Blundergat de brasas ya está lista.");
+              return;
+            }
+            if (ev.step === 40) {
+              this.ui.showBanner("El hacha de incendios", "gold", 4000, "Con X se tira, rebota entre ellos y vuelve sola.");
+              return;
+            }
             if (ev.step === 10) this.ui.showBanner(`${q.key.name[0]!.toUpperCase()}${q.key.name.slice(1)}`, "gold", 9000, q.notes.key);
             else if (ev.step >= 20 && ev.step < 30) {
               const have = EGG_BOAT_PARTS.filter((b) => (this.shadow.egg & b) !== 0).length + 1;
               this.ui.showBanner(`${q.parts[ev.step - 20]?.name ?? "Una pieza"} (${have} de ${EGG_BOAT_PARTS.length})`, "gold", 4000, q.notes.part);
-            } else if (ev.step === 30) this.ui.showBanner("La lancha arranca", "gold", 8000, q.notes.boat);
+            } else if (ev.step === 30) this.ui.showBanner("La lancha arranca", "gold", 9000, `${q.notes.boat} ${q.notes.breakers}`);
             else if (ev.step === 31) {
               this.audio.siren();
               this.ui.showBanner("El faro", "blood", 7000, q.notes.beacon);
             } else if (ev.step === 32) {
               this.audio.boatHorn();
-              this.ui.showBanner("Se abrió la niebla", "gold", 8000, q.notes.ready);
+              this.audio.wardenToll();
+              this.ui.showBanner("Se abrió la niebla", "blood", 8000, q.notes.ready);
             } else if (ev.step === 33) this.audio.boatHorn();
             return;
           }
           if (ev.step === 5) this.ui.showBanner("El horno se llenó", "blood", 3500, steps[2]);
-          else if (ev.step === 3) this.ui.showBanner("Thunder Gun armada", "gold", 4000, steps[3]);
+          else if (ev.step === 3) this.ui.showBanner("Thunder Gun armada", "gold", 9000, q ? `${steps[3]} ${q.notes.safeHint}` : steps[3]);
           else this.ui.showBanner(`Una pieza: ${EGG_PART_NAMES[ev.step] ?? ""}`, "gold", 4000, steps[ev.step]);
         }
         return;
@@ -742,6 +835,11 @@ export class Game {
   /** Un tiro de otro (o la confirmación del propio): trazador, polvo o sangre. */
   private onShotEvent(ev: Extract<SimEvent, { t: "shot" }>): void {
     const own = ev.byId === this.myId;
+    if (weapon(ev.weapon).beam) {
+      // El reflector de otro: una línea de luz breve.
+      if (!own && ev.hits.length >= 3) this.effects.tracer(new THREE.Vector3(ev.x, ev.y - 0.2, ev.z), new THREE.Vector3(ev.hits[0]!, ev.hits[1]!, ev.hits[2]!), 60);
+      return;
+    }
     const shooter = this.buffer.latest?.players.get(ev.byId);
     const pap = false;
     if (!own) this.audio.shot(ev.weapon, ev.x, ev.z, pap);
@@ -806,6 +904,14 @@ export class Game {
     this.audio.listenerYaw = this.camera.rotation.y;
     this.audio.listenerX = this.camera.position.x;
     this.audio.listenerZ = this.camera.position.z;
+    if (this.escapeAt > 0) {
+      const boat = this.world.sailBoat(dt);
+      if (boat) {
+        const k = (now - this.escapeAt) / 8500;
+        this.camera.position.set(boat.x + 9 - k * 4, boat.y + 3.2 + k * 2.4, boat.z + 16 + k * 7);
+        this.camera.lookAt(boat.x, boat.y + 3 + k * 3, boat.z - 8);
+      }
+    }
     if (this.world.art) {
       // El menú y la sala: la cámara avanza despacio por Broadway.
       if (this.lobbyDrift && this.phase === "lobby") {
@@ -906,9 +1012,24 @@ export class Game {
       this.ui.setRound(frame.round.number, frame.round.phase, frame.round.total, frame.round.killed, frame.zombies.length);
       const soulsOn = (this.shadow.egg & EGG_SONG) !== 0 && (this.shadow.egg & EGG_FURNACE) === 0;
       const siege = this.shadow.eggTicks;
-      const note = siege > 0 ? `Aguantá ${Math.floor(siege / TICK_RATE / 60)}:${String(Math.floor(siege / TICK_RATE) % 60).padStart(2, "0")}` : "";
+      const clock = (ticks: number) => `${Math.floor(ticks / TICK_RATE / 60)}:${String(Math.floor(ticks / TICK_RATE) % 60).padStart(2, "0")}`;
+      const boss = frame.zombies.find((zb) => zb.type === ZTYPE_BOSS);
+      const forge = this.questState[5] ?? 0;
+      const brk = this.questState[4] ?? 0;
+      const note = boss
+        ? `El alcaide ${Math.round(boss.hp * 100)} %`
+        : siege > 0
+          ? `Aguantá ${clock(siege)}`
+          : brk > 0
+            ? `Llaves de corte ${clock(brk)}`
+            : forge > 0
+              ? `Horno ${clock(forge)}`
+              : "";
       this.ui.setEffects(this.shadow.instaKill, this.shadow.doublePoints, this.shadow.fireSale, soulsOn ? this.shadow.eggSouls : -1, note);
       this.ui.setMates(frame.players.filter((p) => p.id !== this.myId && p.connected));
+      this.ui.setJournal(this.journalText());
+      const mine = this.predictor?.state;
+      if (mine) this.ui.setAxe(mine.hasAxe, Math.ceil(mine.axeCd / TICK_RATE));
     }
     // La canción del easter egg.
     const song = this.shadow.songTicks > 0;
@@ -1096,6 +1217,15 @@ export class Game {
     }
     const w = weapon(shot.weapon);
     const pap = (s.pap[s.active] ?? 0) === 1;
+    if (w.beam) {
+      this.viewModel.beamOn();
+      const nowMs = performance.now();
+      if (nowMs >= this.beamHumAt) {
+        this.beamHumAt = nowMs + 130;
+        this.audio.beamHum();
+      }
+      return;
+    }
     this.viewModel.fire();
     this.audio.shot(shot.weapon, null, null, pap);
     const r = recoilOffset(w, Math.max(0, s.recoil - 1));
@@ -1179,7 +1309,7 @@ export class Game {
       present.add(z.id);
       let avatar = this.zombieAvatars.get(z.id);
       if (!avatar) {
-        avatar = new ZombieAvatar(z.id, z.type);
+        avatar = z.type === ZTYPE_BOSS ? new WardenAvatar(z.type) : new ZombieAvatar(z.id, z.type);
         this.zombieAvatars.set(z.id, avatar);
         this.zombieGroup.add(avatar.root);
         avatar.groanAt = now + Math.random() * 3000;

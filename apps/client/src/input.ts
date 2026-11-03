@@ -1,4 +1,4 @@
-import { ACT_GRENADE, ACT_NONE, ACT_SLOT_0, ACT_SLOT_1, ACT_SLOT_2, type PlayerInput } from "@wabzomb/shared";
+import { ACT_AXE, ACT_GRENADE, ACT_NONE, ACT_SLOT_0, ACT_SLOT_1, ACT_SLOT_2, type PlayerInput } from "@wabzomb/shared";
 
 /** Tecla -> acción puntual. Se manda una sola vez, en el tick en que se aprieta. */
 const ACTION_KEYS: Record<string, number> = {
@@ -6,6 +6,7 @@ const ACTION_KEYS: Record<string, number> = {
   Digit2: ACT_SLOT_1,
   Digit3: ACT_SLOT_2,
   KeyG: ACT_GRENADE,
+  KeyX: ACT_AXE,
 };
 
 const FWD = new Set(["KeyW", "ArrowUp"]);

@@ -126,6 +126,7 @@ export const FLAG_ON_GROUND = 32;
 export const FLAG_SHOOT_HELD = 64;
 export const FLAG_USE_HELD = 128;
 export const FLAG_SELF_REVIVE = 256;
+export const FLAG_HAS_AXE = 1 << 12;
 
 /**
  * Un zombi: [id, tipo, x, y, z (cm), yaw (mrad), estado (Z_*), ticks del estado,
@@ -176,8 +177,8 @@ export interface SnapshotMsg {
   /** El easter egg (bits EGG_*) y las almas del horno. */
   egg: number;
   souls: number;
-  /** Lo que queda del asedio de la fuga, en ticks. */
-  siege: number;
+  /** La fuga: asedio, combinación (-1 hasta que se pueda ver), ruedas, llaves de corte, tiempo de las llaves, horno, y para quién. */
+  q: [number, number, number, number, number, number, number];
   st: SnapStanding[];
   /** A qué ronda llegaron (cuando terminó). */
   reached: number;

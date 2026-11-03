@@ -27,6 +27,8 @@ export function giveStartingKit(p: PlayerState): void {
   p.pap = [0, 0, 0];
   p.active = 0;
   p.grenades = FRAG_START;
+  p.hasAxe = false;
+  p.axeCd = 0;
   p.perks = 0;
   p.quickRevives = 0;
   p.maxHp = MAX_HP;
@@ -101,6 +103,15 @@ export function startMatch(state: GameState, seed: number, map: GameMap, events:
   state.egg = 0;
   state.eggSouls = 0;
   state.eggTicks = 0;
+  state.breakers = 0;
+  state.breakerTicks = 0;
+  state.forgeTicks = 0;
+  state.forgeBy = -1;
+  state.eggDial = 0;
+  {
+    const rng = state.rng ?? Math.random;
+    state.eggCode = Math.floor(rng() * 10) * 100 + Math.floor(rng() * 10) * 10 + Math.floor(rng() * 10);
+  }
   state.reachedRound = 0;
   // La caja arranca en cualquiera de sus lugares: en cada partida hay que salir a buscarla.
   state.box.spot = Math.floor((state.rng ?? Math.random)() * Math.max(1, map.boxSpots.length));
