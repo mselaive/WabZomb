@@ -310,7 +310,7 @@ function findQuest(state: GameState, p: PlayerState, map: GameMap, near: (x: num
 
   // La caja fuerte: tres ruedas, y se elige la que está enfrente.
   if ((e & EGG_SAFE) === 0 && near(q.safe.x, q.safe.z, 2.4, q.safe.y)) {
-    if ((e & EGG_BUILT) === 0) return info("Una caja fuerte", "No se te ocurre la combinación");
+    if ((e & EGG_BUILT) === 0) return info("La caja fuerte del alcaide", "Trabada. La combinación aparece cuando armes la Thunder Gun");
     const w = wheelAt(q, p.x);
     return act(20 + w, `Girar la rueda ${"I".repeat(w + 1)}: ${dialDigit(state.eggDial, w)}`);
   }

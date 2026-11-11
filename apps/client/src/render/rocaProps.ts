@@ -479,7 +479,7 @@ export function buildQuestItem(kind: number, puff: THREE.Texture, brass: THREE.M
 }
 
 /** La caja fuerte del alcaide: un frente de acero con tres ruedas. `door` se abre al dar con la combinación. */
-export function buildSafe(steel: THREE.Material, wheels: number[], centerX: number): { group: THREE.Group; door: THREE.Group; dials: THREE.Mesh[] } {
+export function buildSafe(steel: THREE.Material, wheels: number[], centerX: number): { group: THREE.Group; door: THREE.Group; dials: THREE.Mesh[]; plaques: THREE.Mesh[] } {
   const g = new THREE.Group();
   const dark = new THREE.MeshStandardMaterial({ color: 0x0c0d0f, roughness: 0.8 });
   const brass = new THREE.MeshStandardMaterial({ color: 0xa8843c, metalness: 0.85, roughness: 0.35 });
@@ -499,6 +499,7 @@ export function buildSafe(steel: THREE.Material, wheels: number[], centerX: numb
   plate.position.x = 1.12;
   door.add(plate);
   const dials: THREE.Mesh[] = [];
+  const plaques: THREE.Mesh[] = [];
   for (const wx of wheels) {
     const dial = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.06, 18), brass);
     dial.rotation.x = Math.PI / 2;
@@ -511,9 +512,38 @@ export function buildSafe(steel: THREE.Material, wheels: number[], centerX: numb
     mark.rotation.x = Math.PI / 2;
     mark.position.z = 0.11;
     dial.add(mark);
+    // Arriba de cada rueda, una plaquita con el número que marca (la cambia `setSafeDigit`).
+    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshBasicMaterial({ map: safeDigitTexture(0) }));
+    plaque.rotation.y = Math.PI;
+    plaque.position.set(wx - centerX + 1.12, 0.3, -0.045);
+    door.add(plaque);
+    plaques.push(plaque);
   }
   g.add(door);
-  return { group: g, door, dials };
+  return { group: g, door, dials, plaques };
+}
+
+const safeDigits: THREE.Texture[] = [];
+/** El número de una rueda de la caja fuerte: negro sobre bronce, para la plaquita. */
+function safeDigitTexture(d: number): THREE.Texture {
+  safeDigits[d] ??= canvasTexture(128, 128, (ctx) => {
+    ctx.fillStyle = "#b8944a";
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = "#3a2a10";
+    ctx.lineWidth = 8;
+    ctx.strokeRect(4, 4, 120, 120);
+    ctx.fillStyle = "#16100a";
+    ctx.font = "bold 96px Rajdhani, ui-sans-serif, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(d), 64, 70);
+  });
+  return safeDigits[d]!;
+}
+
+/** Cambia el número que muestra la plaquita de una rueda. */
+export function setSafeDigit(plaque: THREE.Mesh, d: number): void {
+  (plaque.material as THREE.MeshBasicMaterial).map = safeDigitTexture(d);
 }
 
 /** Un número en la pared, en tiza. Las rayas de arriba dicen qué rueda es. */
@@ -524,9 +554,9 @@ export function chalkDigit(order: number, digit: number): THREE.Mesh {
     ctx.strokeStyle = "rgba(232,228,214,0.92)";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "bold 150px Rajdhani, ui-sans-serif, sans-serif";
-    ctx.fillText(String(digit), 128, 150);
-    ctx.lineWidth = 12;
+    ctx.font = "bold 170px Rajdhani, ui-sans-serif, sans-serif";
+    ctx.fillText(String(digit), 128, 156);
+    ctx.lineWidth = 14;
     for (let i = 0; i <= order; i++) {
       const x = 128 + (i - order / 2) * 34;
       ctx.beginPath();
@@ -536,13 +566,13 @@ export function chalkDigit(order: number, digit: number): THREE.Mesh {
     }
     // Se ve vieja: se come pedazos.
     ctx.globalCompositeOperation = "destination-out";
-    for (let i = 0; i < 500; i++) {
-      ctx.fillStyle = `rgba(0,0,0,${0.2 + Math.random() * 0.7})`;
+    for (let i = 0; i < 220; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${0.2 + Math.random() * 0.6})`;
       ctx.fillRect(Math.random() * 256, Math.random() * 256, 1 + Math.random() * 5, 1 + Math.random() * 3);
     }
   });
   return new THREE.Mesh(
-    new THREE.PlaneGeometry(0.62, 0.62),
+    new THREE.PlaneGeometry(0.95, 0.95),
     new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
   );
 }

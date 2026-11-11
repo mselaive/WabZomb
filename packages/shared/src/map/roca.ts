@@ -942,7 +942,8 @@ function build(): GameMap {
     light(x, 8.6, 7, 11, 11, "grid", COLD, "hanging");
     light(x, 8.6, 0, 7, 9, "grid", COLD, "bulb");
   }
-  light(-57, 8.5, 0, 22, 8, "grid", 0xffffff, "lamp");
+  // La lámpara de cirugía: fuerte sobre la camilla, pero sin encandilar la sala (con 22 quemaba todo).
+  light(-57, 8.5, 0, 9, 8, "grid", 0xffffff, "lamp");
   light(-32, 8, -7.8, 7, 11, "off", RED, "bulb");
   light(-45, 7.8, 1.5, 7, 11, "off", RED, "bulb");
   // Las oficinas, con luz cálida.
@@ -1037,7 +1038,7 @@ function build(): GameMap {
     maxDrop: 0.5,
     sky: 0x0a1018,
     quest: {
-      key: { name: "la llave del alcaide", x: 41, y: 0, z: -15.75, h: 1.25 },
+      key: { name: "la llave del alcaide", x: 41, y: 0, z: -15.9, h: 1.25 },
       parts: [
         { name: "las bujías", x: -67.2, y: 0, z: -4, h: 1.0 },
         { name: "la hélice", x: -60.9, y: 0, z: 30, h: 0.35 },

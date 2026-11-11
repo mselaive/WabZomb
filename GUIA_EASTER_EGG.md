@@ -72,7 +72,9 @@ Está en la **oficina del alcaide**, en la pared del fondo, atrás del escritori
 | Tres | **Hospital**: en la pared oeste de la sala de operaciones |
 
 - **Cómo se gira:** parate enfrente de la rueda que quieras y apretá **E**. Cada vez sube uno, y del
-  9 pasa al 0. Cuando las tres coinciden se abre sola.
+  9 pasa al 0: el número que marca está en la plaquita de arriba de cada rueda. Cuando las tres
+  coinciden se abre sola.
+- **Antes de armar la Thunder Gun** las ruedas no giran: el cartel dice "Trabada".
 - **Adentro:** la **llave del alcaide**. Agarrala con **E**.
 
 ### 6. La lancha

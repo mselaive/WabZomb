@@ -34,7 +34,7 @@ import {
 } from "@wabzomb/shared";
 import { makeAllMaterials, makeChalkTexture, makeLabelTexture, makePuffTexture } from "./textures.js";
 import { RocaArt } from "./roca.js";
-import { buildVisitBooth, buildVisitPhone } from "./rocaProps.js";
+import { buildVisitBooth, buildVisitPhone, setSafeDigit } from "./rocaProps.js";
 import { buildBoat, buildBreaker, buildFurnaceFront, buildPapMachine, buildQuestItem, buildSafe, buildWoodDoor, chalkDigit, furnaceEmbers, powerPanelFace, buildPerkCabinet, buildSteelDoor, buildWindowFrame } from "./rocaProps.js";
 import { buildAxeMesh, buildGrenadeMesh, buildWeaponMesh, setWeaponEnvironment } from "./viewmodel.js";
 
@@ -760,8 +760,11 @@ export class World {
     this.boat = { group, lamp, engine, baseY: group.position.y };
 
     // La caja fuerte, en la pared de la oficina del alcaide.
-    const safe = buildSafe(this.materials[25]!, q.safeWheels, q.safe.x);
+    // Se arma mirando a -Z y la oficina queda del otro lado: se la da vuelta, y las ruedas van
+    // en espejo para que cada una quede en la X donde el servidor la busca.
+    const safe = buildSafe(this.materials[25]!, q.safeWheels.map((x) => 2 * q.safe.x - x), q.safe.x);
     safe.group.position.set(q.safe.x, q.safe.y, q.safe.z);
+    safe.group.rotation.y = Math.PI;
     this.propGroup.add(safe.group);
     this.art?.bakeLight(safe.group, q.safe.x, q.safe.y + 1.4, q.safe.z + 1, 0, 0, 1);
     this.safe = safe;
@@ -832,6 +835,8 @@ export class World {
         this.safe.dials.forEach((d, i) => {
           const digit = Math.floor(dial / (i === 0 ? 100 : i === 1 ? 10 : 1)) % 10;
           d.rotation.y = (digit / 10) * Math.PI * 2;
+          const plaque = this.safe!.plaques[i];
+          if (plaque) setSafeDigit(plaque, digit);
         });
       }
       const open = (egg & EGG_SAFE) !== 0 ? -1.75 : 0;
