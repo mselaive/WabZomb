@@ -12,8 +12,12 @@ export const MS_PER_TICK = 1000 / TICK_RATE;
 /** Los demás (y los zombis) se dibujan este tiempo en el pasado, interpolando entre snapshots. */
 export const INTERP_DELAY_MS = 100;
 
-/** Hasta cuántos ticks se rebobina a los zombis para decidir un tiro (compensación de lag). */
-export const LAG_COMP_MAX_TICKS = 8;
+/**
+ * Hasta cuántos ticks se rebobina a los zombis para decidir un tiro (compensación
+ * de lag): 600 ms alcanzan para un ping de 250 con el colchón más grande del
+ * cliente (200 ms). Tiene que quedar por debajo de TRAIL_LENGTH.
+ */
+export const LAG_COMP_MAX_TICKS = 12;
 /** Cuántas posiciones pasadas se recuerdan de cada cuerpo. */
 export const TRAIL_LENGTH = 16;
 

@@ -1131,8 +1131,8 @@ function buildPowerUp(kind: number, puff: THREE.Texture): THREE.Group {
   label.scale.set(1.4, 0.28, 1);
   label.position.y = 0.45;
   g.add(label);
-  const light = new THREE.PointLight(c, 1.5, 5, 1.6);
-  g.add(light);
+  // Sin luz propia: una luz que aparece y desaparece (y parpadea al irse) hace
+  // recompilar todos los shaders de la escena.
   return g;
 }
 

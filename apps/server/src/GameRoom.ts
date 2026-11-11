@@ -34,6 +34,7 @@ import {
   packRound,
   packStandings,
   packZombie,
+  runTestCommand,
   sanitizeChat,
   sanitizeName,
   sanitizeToken,
@@ -314,6 +315,13 @@ export class GameRoom extends Server<Env> {
         const text = sanitizeChat(msg.text);
         if (!text) return;
         seat.lastChatAt = now;
+        // Los comandos de prueba (/arma, /puntos...): sólo jugando solo, y la respuesta es para él.
+        if (text.startsWith("/")) {
+          const p = findPlayer(this.state, seat.playerId);
+          const reply = this.seats.size > 1 ? "Los comandos de prueba son sólo jugando solo." : p ? runTestCommand(p, text) : null;
+          if (reply) this.sendTo(conn, { t: "chat", by: -1, text: reply });
+          return;
+        }
         this.broadcast(encodeServer({ t: "chat", by: seat.playerId, text }));
         return;
       }

@@ -274,6 +274,8 @@ export class RocaArt {
   private skyMat: THREE.ShaderMaterial | null = null;
   private dust: THREE.Points | null = null;
   private rain: THREE.LineSegments | null = null;
+  /** Sin lluvia: en una máquina lenta, cuando el juego baja la calidad solo. */
+  rainOff = false;
   private shafts: THREE.ShaderMaterial | null = null;
   private lightning = 0;
   private nextLightning = 12;
@@ -1635,7 +1637,7 @@ export class RocaArt {
       this.dust.visible = !outdoor;
     }
     if (this.rain) {
-      this.rain.visible = outdoor;
+      this.rain.visible = outdoor && !this.rainOff;
       if (outdoor) this.rain.position.set(cam.x, cam.y - 10 - ((t * 26) % 22) + 22, cam.z);
     }
   }

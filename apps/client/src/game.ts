@@ -16,7 +16,6 @@ import {
   HIT_BODY,
   HIT_HEAD,
   HIT_WORLD,
-  INTERP_DELAY_MS,
   MS_PER_TICK,
   EGG_BEACON,
   EGG_BOAT,
@@ -54,7 +53,6 @@ import {
   mapByIndex,
   rayAabb,
   raycastBoxes,
-  recoilOffset,
   slotLimit,
   spreadOf,
   unpackBox,
@@ -136,6 +134,10 @@ export class Game {
   private seq = 1;
   private inputAcc = 0;
   private viewTick = -1;
+  private netPanel: HTMLPreElement | null = null;
+  private netPanelAt = 0;
+  private netFrames = 0;
+  private netCorrections = 0;
   private lastFrame = performance.now();
   private roomCode = "";
   private leaving = false;
@@ -199,6 +201,13 @@ export class Game {
     });
     window.addEventListener("mousedown", () => this.audio.unlock(), { passive: true });
     window.addEventListener("keydown", () => this.audio.unlock(), { passive: true });
+    // F3: el panel de la red, para saber si lo que se traba es la conexión o la máquina.
+    window.addEventListener("keydown", (e) => {
+      if (e.code !== "F3") return;
+      e.preventDefault();
+      this.toggleNetPanel();
+    });
+    if (new URLSearchParams(location.search).has("net")) this.toggleNetPanel();
     window.addEventListener("resize", () => this.resize());
     this.resize();
 
@@ -371,7 +380,7 @@ export class Game {
         this.ui.showError(msg.message);
         return;
       case "chat":
-        this.ui.addChat(this.ui.nameOf(msg.by), msg.text, this.phase === "playing");
+        this.ui.addChat(msg.by < 0 ? "Juego" : this.ui.nameOf(msg.by), msg.text, this.phase === "playing");
         return;
     }
   }
@@ -876,15 +885,51 @@ export class Game {
 
   // ------------------------------------------------------------ cuadro a cuadro
 
+  private toggleNetPanel(): void {
+    if (this.netPanel) {
+      this.netPanel.remove();
+      this.netPanel = null;
+      return;
+    }
+    const el = document.createElement("pre");
+    el.style.cssText = "position:fixed;top:8px;right:8px;z-index:50;margin:0;padding:6px 8px;background:rgba(0,0,0,.6);color:#cfe;font:12px/1.35 ui-monospace,monospace;pointer-events:none;white-space:pre";
+    document.body.append(el);
+    this.netPanel = el;
+    this.netPanelAt = 0;
+  }
+
+  /** Cada medio segundo: cuadros por segundo, ping, y cómo vienen los snapshots. */
+  private updateNetPanel(now: number): void {
+    if (!this.netPanel) return;
+    this.netFrames++;
+    if (now - this.netPanelAt < 500) return;
+    const secs = this.netPanelAt > 0 ? (now - this.netPanelAt) / 1000 : 0;
+    const fps = secs > 0 ? Math.round(this.netFrames / secs) : 0;
+    const t = this.buffer.takeTiming();
+    const corrections = this.predictor?.corrections ?? 0;
+    const lag = this.net?.simulatedLagMs ? `  (simulado ${this.net.simulatedLagMs})` : "";
+    this.netPanel.textContent = [
+      `FPS ${fps}`,
+      `ping ${Math.round(this.net?.rtt ?? 0)} ms${lag}`,
+      `jitter ${t.jitterMs} ms · colchón ${t.delayMs} ms`,
+      `adivinado ${t.extrapolatedPct}% · quieto ${t.frozenPct}%`,
+      `correcciones ${corrections - this.netCorrections} · sin confirmar ${this.predictor?.pendingCount ?? 0}`,
+    ].join("\n");
+    this.netCorrections = corrections;
+    this.netFrames = 0;
+    this.netPanelAt = now;
+  }
+
   private frame(now: number): void {
     const dt = Math.min(0.1, (now - this.lastFrame) / 1000);
     this.lastFrame = now;
+    this.updateNetPanel(now);
 
     this.handleIntents();
     this.refreshLockHint();
     if (this.phase === "playing") this.updatePlaying(now, dt);
     else if (this.phase === "countdown") {
-      const frame = this.buffer.sample(now - INTERP_DELAY_MS);
+      const frame = this.buffer.sample(now);
       if (frame) this.updateOthers(frame, dt);
     }
 
@@ -928,6 +973,7 @@ export class Game {
         this.post.setSize(this.stage.clientWidth || window.innerWidth, this.stage.clientHeight || window.innerHeight);
       }
       this.post.render(dt);
+      if (this.world.art && this.post.lowQuality) this.world.art.rainOff = true;
     } else {
       this.audio.stopAmbience();
       this.renderer.render(this.world.scene, this.camera);
@@ -998,7 +1044,7 @@ export class Game {
   }
 
   private updatePlaying(now: number, dt: number): void {
-    const frame = this.buffer.sample(now - INTERP_DELAY_MS);
+    const frame = this.buffer.sample(now);
     if (frame) {
       this.viewTick = frame.tick;
       this.lastInterp = frame;
@@ -1228,9 +1274,9 @@ export class Game {
     }
     this.viewModel.fire();
     this.audio.shot(shot.weapon, null, null, pap);
-    const r = recoilOffset(w, Math.max(0, s.recoil - 1));
-    this.punchPitch = Math.min(0.12, this.punchPitch + w.kick + r.y * 0.35);
-    this.punchYaw += r.x * 0.4 + (Math.random() - 0.5) * w.kick * 0.3;
+    // La bala va al centro de la mira: la sacudida es sólo para que se sienta, y chica.
+    this.punchPitch = Math.min(0.045, this.punchPitch + w.kick * 0.6);
+    this.punchYaw += (Math.random() - 0.5) * w.kick * 0.2;
     const ox = s.x;
     const oy = s.y + eyeHeightOf(s);
     const oz = s.z;

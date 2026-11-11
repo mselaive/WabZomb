@@ -75,6 +75,11 @@ export class Post {
   private acc = 0;
   private downgraded = 0;
 
+  /** Si ya bajó la calidad porque la máquina no daba 40 cuadros por segundo. */
+  get lowQuality(): boolean {
+    return this.downgraded > 0;
+  }
+
   constructor(
     private readonly renderer: THREE.WebGLRenderer,
     scene: THREE.Scene,

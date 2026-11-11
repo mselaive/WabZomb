@@ -11,6 +11,7 @@ export * from "./sim/grenade.js";
 export * from "./sim/powerups.js";
 export * from "./sim/zombies.js";
 export * from "./sim/interact.js";
+export * from "./sim/testCommands.js";
 export * from "./sim/rounds.js";
 export * from "./sim/step.js";
 export * from "./sim/nav.js";

@@ -216,6 +216,12 @@ npm run typecheck
 npm run smoke     # compila el cliente y comprueba que el bundle arranque (playwright)
 ```
 
+## Probar armas
+
+Jugando solo, en el chat (Enter): `/arma blundergat` (o `/arma l96 pap` mejorada), `/armas` para la lista,
+`/puntos 50000` y `/municion`. Con más de un jugador en la sala el servidor no los acepta. F3 muestra
+FPS, ping y cómo vienen los snapshots, y `?lag=160&jitter=40` en la URL simula una red mala.
+
 ## Desplegar
 
 Igual que WabCS: `npm run deploy:server` con tu cuenta de Cloudflare (`npx wrangler login`), y el

@@ -51,7 +51,11 @@ import { HIT_BODY, HIT_HEAD, HIT_NONE, HIT_WORLD, type Body, type GameState, typ
 const MAX_RANGE = 200;
 const RECOIL_COOL_TICKS = 3;
 const SCOPED_SPREAD = 0.0008;
-const AIR_SPREAD = 0.1;
+const AIR_SPREAD = 0.05;
+/** Lo que se abre el arma por tiro seguido (y su tope, en tiros), y por moverse. */
+const BLOOM_PER_SHOT = 0.5;
+const BLOOM_MAX_SHOTS = 6;
+const MOVE_SPREAD = 0.5;
 
 /** Cuántas ranuras de arma tiene: dos, tres con Mule Kick. */
 export function slotLimit(p: PlayerState): number {
@@ -177,9 +181,9 @@ export function spreadOf(p: PlayerState, w: WeaponDef, recoilBefore: number): nu
   if (p.scoped) return SCOPED_SPREAD + w.spreadShot * recoilBefore * 0.25;
   let s = w.spread;
   if (p.crouch >= CROUCH_TICKS) s *= 0.6;
-  s += w.spreadShot * recoilBefore;
+  s += w.spreadShot * Math.min(recoilBefore * BLOOM_PER_SHOT, BLOOM_MAX_SHOTS);
   const speed = Math.sqrt(p.vx * p.vx + p.vz * p.vz);
-  s += w.spreadMove * Math.min(1, speed / Math.max(0.1, w.speed));
+  s += w.spreadMove * MOVE_SPREAD * Math.min(1, speed / Math.max(0.1, w.speed));
   if (!p.onGround) s += AIR_SPREAD;
   return s;
 }
@@ -192,7 +196,11 @@ export function recoilOffset(w: WeaponDef, n: number): { x: number; y: number } 
   return { x: w.recoilSide * side, y };
 }
 
-/** Hacia dónde sale cada perdigón de un tiro. Determinista: el cliente y el servidor sacan lo mismo. */
+/**
+ * Hacia dónde sale cada perdigón de un tiro. Determinista: el cliente y el servidor sacan lo mismo.
+ * Como en CoD, la bala va adonde apunta la mira, con la dispersión del arma: el
+ * retroceso sacude la cámara pero no corre el tiro (eso era de Counter-Strike).
+ */
 export function shotDirections(p: PlayerState, wid: number, seq: number): Vec3[] {
   const w = weapon(wid);
   const fwd = viewDir(p.yaw, p.pitch, { x: 0, y: 0, z: 0 });
@@ -203,15 +211,14 @@ export function shotDirections(p: PlayerState, wid: number, seq: number): Vec3[]
   const uz = rx * fwd.y;
   const n = Math.max(0, p.recoil - 1);
   const spread = spreadOf(p, w, n);
-  const recoil = p.scoped ? { x: 0, y: 0 } : recoilOffset(w, n);
   const out: Vec3[] = [];
   for (let i = 0; i < w.pellets; i++) {
     const u = hashUnit(p.id, seq, i * 2 + 1);
     const v = hashUnit(p.id, seq, i * 2 + 2);
     const r = spread * Math.sqrt(u);
     const a = v * Math.PI * 2;
-    const ox = Math.cos(a) * r + recoil.x;
-    const oy = Math.sin(a) * r + recoil.y;
+    const ox = Math.cos(a) * r;
+    const oy = Math.sin(a) * r;
     let dx = fwd.x + rx * ox + ux * oy;
     let dy = fwd.y + uy * oy;
     let dz = fwd.z + rz * ox + uz * oy;

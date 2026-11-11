@@ -83,7 +83,8 @@ export class Predictor {
       } else applySlotAction(s, input.act);
     }
     if (stepMelee(s, input, canAct)) out = { seq: input.seq, weapon: -1, dirs: [] };
-    const fired = stepWeaponState(s, input, canAct && !s.down);
+    // Caído también se dispara, igual que en el servidor (con la pistola).
+    const fired = stepWeaponState(s, input, canAct);
     if (fired >= 0) out = { seq: input.seq, weapon: fired, dirs: shotDirections(s, fired, input.seq) };
     return out;
   }

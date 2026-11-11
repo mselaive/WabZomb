@@ -54,6 +54,7 @@ import {
   WALL_AMMO_FACTOR,
 } from "../constants.js";
 import type { Box, GameMap } from "../map/types.js";
+import { viewDir } from "../math.js";
 import { BRASAS, FRAG, KNIFE, SLOT_COUNT, THUNDERGUN, TRABUCO, rollBox, weapon, weaponStats } from "../weapons.js";
 import { applyPerk, givePoints, revivePlayer, slotLimit, switchTo } from "./combat.js";
 import { hasPerk } from "./movement.js";
@@ -133,11 +134,21 @@ export function giveWeapon(p: PlayerState, wid: number, pap = false): number {
 }
 
 /** Qué hay a mano de este jugador, por prioridad. null si nada. */
+/** Cuánto hay que mirar un arma de la pared para comprarla (coseno, unos 50°), salvo pegado a ella. */
+const FACE_COS = 0.64;
+const FACE_ANY_RANGE = 0.8;
+
 export function findInteraction(state: GameState, p: PlayerState, map: GameMap): Interaction | null {
   if (!p.alive) return null;
   const x = p.x;
   const z = p.z;
   const near = (px: number, pz: number, range = USE_RANGE, py = 0) => Math.hypot(px - x, pz - z) <= range && Math.abs(py - p.y) < 2.2;
+  // Un arma de la pared se compra mirándola: así reparar la ventana de al lado no la compra.
+  const look = viewDir(p.yaw, 0, { x: 0, y: 0, z: 0 });
+  const facing = (px: number, pz: number) => {
+    const d = Math.hypot(px - x, pz - z);
+    return d < FACE_ANY_RANGE || ((px - x) * look.x + (pz - z) * look.z) / d >= FACE_COS;
+  };
   const humans = state.players.filter((q) => q.connected).length;
 
   // Un compañero caído: lo primero.
@@ -191,7 +202,7 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
   // Las armas de la pared.
   for (let i = 0; i < map.wallWeapons.length; i++) {
     const ww = map.wallWeapons[i]!;
-    if (!near(ww.x, ww.z, USE_RANGE, ww.y - 1.4)) continue;
+    if (!near(ww.x, ww.z, USE_RANGE, ww.y - 1.4) || !facing(ww.x, ww.z)) continue;
     const w = weapon(ww.weapon);
     if (ww.weapon === FRAG) {
       const price = 250;

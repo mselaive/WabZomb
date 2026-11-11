@@ -44,16 +44,24 @@ try {
   page.on("console", (m) => {
     if (m.type() === "error") problemas.push(`error: ${m.text()}`);
   });
-  page.on("requestfailed", (r) => problemas.push(`petición fallida: ${r.url()}`));
+  // Mientras el servidor arranca, los intentos de abrir la página que se cortan
+  // por tiempo no son problemas del build: se reintenta y listo.
+  let arrancando = true;
+  const raiz = `http://localhost:${PORT}/`;
+  page.on("requestfailed", (r) => {
+    if (arrancando && r.url() === raiz) return;
+    problemas.push(`petición fallida: ${r.url()}`);
+  });
 
   for (let i = 0; i < 30; i++) {
     try {
-      await page.goto(`http://localhost:${PORT}/`, { waitUntil: "domcontentloaded", timeout: 2000 });
+      await page.goto(raiz, { waitUntil: "domcontentloaded", timeout: 2000 });
       break;
     } catch {
       await new Promise((r) => setTimeout(r, 500));
     }
   }
+  arrancando = false;
 
   // El botón se habilita recién cuando `Game.init()` resolvió: el renderizador arrancó.
   await page.waitForFunction(

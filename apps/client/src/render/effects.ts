@@ -68,10 +68,12 @@ export class Effects {
 
   constructor(scene: THREE.Scene) {
     scene.add(this.group);
-    // Dos luces para fogonazos, que se van turnando.
+    // Dos luces para fogonazos, que se van turnando. Siempre visibles, apagadas
+    // con intensidad 0: si cambia cuántas luces hay, Three recompila los shaders de
+    // todos los materiales de la escena, y en La Roca eso congelaba el juego 11 s en
+    // el primer tiro.
     for (let i = 0; i < 2; i++) {
       const light = new THREE.PointLight(0xffc27a, 0, 7, 1.6);
-      light.visible = false;
       this.group.add(light);
       this.flashes.push({ light, life: 0 });
     }
@@ -161,7 +163,6 @@ export class Effects {
     const f = this.flashes.reduce((a, b) => (a.life <= b.life ? a : b));
     f.light.position.copy(at);
     f.light.intensity = intensity;
-    f.light.visible = true;
     f.life = 0.06;
   }
 
@@ -256,10 +257,7 @@ export class Effects {
     for (const f of this.flashes) {
       if (f.life <= 0) continue;
       f.life -= dt;
-      if (f.life <= 0) {
-        f.light.visible = false;
-        f.light.intensity = 0;
-      }
+      if (f.life <= 0) f.light.intensity = 0;
     }
   }
 

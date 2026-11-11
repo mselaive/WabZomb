@@ -28,11 +28,44 @@ function reconnectToken(room: string): string {
   }
 }
 
-/** `?lag=200` simula 200 ms de ida y vuelta sin salir de tu máquina. */
-function lagFromUrl(): number {
-  const raw = new URLSearchParams(location.search).get("lag");
+/**
+ * `?lag=200` simula 200 ms de ida y vuelta sin salir de tu máquina, y
+ * `&jitter=60` le suma hasta 60 ms al azar a cada mensaje, como una red de verdad.
+ */
+function msFromUrl(name: string): number {
+  const raw = new URLSearchParams(location.search).get(name);
   const v = raw ? Number(raw) : 0;
   return Number.isFinite(v) && v > 0 ? Math.min(v, 2000) : 0;
+}
+
+/**
+ * Demora cada mensaje medio lag más algo al azar, sin desordenarlos: un
+ * WebSocket nunca entrega uno antes que el anterior, así que el que llega tarde
+ * arrastra a los de atrás, y salen de a varios juntos.
+ */
+class LagLine {
+  private queue: { at: number; fn: () => void }[] = [];
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  constructor(private readonly oneWay: number, private readonly jitter: number) {}
+  get active(): boolean {
+    return this.oneWay > 0 || this.jitter > 0;
+  }
+  run(fn: () => void): void {
+    const tail = this.queue[this.queue.length - 1]?.at ?? 0;
+    this.queue.push({ at: Math.max(tail, performance.now() + this.oneWay + Math.random() * this.jitter), fn });
+    if (!this.timer) this.schedule();
+  }
+  // Un solo temporizador que los saca en fila: con uno por mensaje, el redondeo al
+  // milisegundo de setTimeout a veces adelanta uno al anterior.
+  private schedule(): void {
+    const next = this.queue[0];
+    this.timer = next ? setTimeout(() => this.drain(), Math.max(0, next.at - performance.now())) : null;
+  }
+  private drain(): void {
+    const now = performance.now() + 0.5;
+    while (this.queue.length > 0 && this.queue[0]!.at <= now) this.queue.shift()!.fn();
+    this.schedule();
+  }
 }
 
 function serverHost(): string {
@@ -75,7 +108,10 @@ export async function diagnoseConnection(room: string): Promise<string> {
 /** Conexión con la sala: PartySocket, ping, y latencia artificial para probar. */
 export class Net {
   private socket: PartySocket;
-  private readonly lag = lagFromUrl();
+  private readonly lag = msFromUrl("lag");
+  private readonly jitter = msFromUrl("jitter");
+  private readonly down = new LagLine(this.lag / 2, this.jitter);
+  private readonly up = new LagLine(this.lag / 2, this.jitter);
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private closed = false;
 
@@ -112,7 +148,7 @@ export class Net {
         }
         opts.onMessage(msg);
       };
-      if (this.lag > 0) setTimeout(deliver, this.lag / 2);
+      if (this.down.active) this.down.run(deliver);
       else deliver();
     });
 
@@ -131,7 +167,7 @@ export class Net {
       if (this.closed) return;
       if (this.socket.readyState === WebSocket.OPEN) this.socket.send(raw);
     };
-    if (this.lag > 0) setTimeout(push, this.lag / 2);
+    if (this.up.active) this.up.run(push);
     else push();
   }
 

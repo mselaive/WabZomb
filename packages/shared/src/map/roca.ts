@@ -854,15 +854,15 @@ function build(): GameMap {
   const boxCellA = openCell(rowA, 12);
 
   const wallWeapons: WallWeapon[] = [
-    { weapon: M14, x: -14, y: 1.5, z: -2.97, yaw: Math.PI, zone: 0 },
-    { weapon: OLYMPIA, x: 14, y: 1.5, z: 2.97, yaw: 0, zone: 0 },
+    { weapon: M14, x: -7, y: 1.5, z: -2.97, yaw: Math.PI, zone: 0 },
+    { weapon: OLYMPIA, x: 8, y: 1.5, z: 2.97, yaw: 0, zone: 0 },
     { weapon: MP40, x: -30.92, y: 1.5, z: 8, yaw: -Math.PI / 2, zone: 1 },
     { weapon: FRAG, x: 29.92, y: 1.5, z: -8, yaw: Math.PI / 2, zone: 2 },
-    { weapon: M16, x: -44.5, y: 1.6, z: -12.95, yaw: Math.PI, zone: 4 },
-    { weapon: STAKEOUT, x: -40, y: 1.5, z: 12.95, yaw: 0, zone: 4 },
+    { weapon: M16, x: -50, y: 1.6, z: -12.95, yaw: Math.PI, zone: 4 },
+    { weapon: STAKEOUT, x: -47, y: 1.5, z: 12.95, yaw: 0, zone: 4 },
     { weapon: PYTHON, x: 40, y: 1.5, z: 15.95, yaw: 0, zone: 7 },
     { weapon: AK74U, x: 0, y: 1.5, z: -15.38, yaw: Math.PI, zone: 5 },
-    { weapon: MP5K, x: -52, y: 1.5, z: 43.95, yaw: 0, zone: 9 },
+    { weapon: MP5K, x: -57, y: 1.5, z: 43.95, yaw: 0, zone: 9 },
     { weapon: PM63, x: 2, y: 1.5, z: 15.38, yaw: 0, zone: 6 },
     { weapon: THOMPSON, x: -14, y: 1.5, z: -15.38, yaw: Math.PI, zone: 5 },
     { weapon: WINCHESTER, x: -10, y: 1.5, z: 15.38, yaw: 0, zone: 6 },
