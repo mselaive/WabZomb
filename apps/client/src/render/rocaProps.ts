@@ -563,6 +563,90 @@ export function buildBreaker(steel: THREE.Material): { group: THREE.Group; lever
   return { group: g, lever, lamp };
 }
 
+/**
+ * Un puesto de la sala de visitas, arriba de su mostrador (2 m de ancho, centrado
+ * en el origen, de 1 m de alto): el vidrio con su marco, partido al medio, y un
+ * taburete de cada lado.
+ */
+export function buildVisitBooth(steel: THREE.Material): THREE.Group {
+  const g = new THREE.Group();
+  const glass = new THREE.MeshStandardMaterial({ color: 0xbcd4dc, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide });
+  const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.86, 0.84), glass);
+  pane.position.set(0, 1.45, 0);
+  g.add(pane);
+  // El marco: los parantes, el de arriba, y el del medio que separa los dos puestos.
+  for (const x of [-0.96, 0, 0.96]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.9, 0.06), steel);
+    post.position.set(x, 1.45, 0);
+    g.add(post);
+  }
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.98, 0.06, 0.08), steel);
+  top.position.set(0, 1.92, 0);
+  g.add(top);
+  const seat = new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.7 });
+  for (const side of [-1, 1]) {
+    for (const x of [-0.5, 0.5]) {
+      const stool = new THREE.Group();
+      const top2 = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.05, 16), seat);
+      top2.position.y = 0.5;
+      stool.add(top2);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.04, 0.48, 8), steel);
+      leg.position.y = 0.24;
+      stool.add(leg);
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.025, 14), steel);
+      foot.position.y = 0.012;
+      stool.add(foot);
+      stool.position.set(x, 0, side * 0.85);
+      g.add(stool);
+    }
+  }
+  return g;
+}
+
+/**
+ * Un teléfono de visitas amurado contra el vidrio: la caja, el gancho, el tubo
+ * negro colgado y el cable en espiral, más una lucecita que avisa cuando suena.
+ * Mira hacia +Z; `handset` es lo que tiembla al sonar.
+ */
+export function buildVisitPhone(): { group: THREE.Group; handset: THREE.Group; lamp: THREE.MeshStandardMaterial } {
+  const g = new THREE.Group();
+  const black = new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.28, metalness: 0.2 });
+  const chrome = new THREE.MeshStandardMaterial({ color: 0x9a9ea4, roughness: 0.25, metalness: 0.9 });
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.26, 0.06), new THREE.MeshStandardMaterial({ color: 0x2a3a34, roughness: 0.6, metalness: 0.5 }));
+  box.position.set(0, 0, 0.03);
+  g.add(box);
+  const hook = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.05), chrome);
+  hook.position.set(0.11, 0.1, 0.06);
+  g.add(hook);
+  // El tubo: el mango con el auricular arriba y el micrófono abajo, colgado del gancho.
+  const handset = new THREE.Group();
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.17, 10), black);
+  handset.add(grip);
+  for (const y of [0.1, -0.1]) {
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.03, 0.045, 14), black);
+    cup.rotation.x = Math.PI / 2;
+    cup.position.set(0, y, 0.02);
+    handset.add(cup);
+  }
+  handset.position.set(0.15, -0.01, 0.08);
+  handset.scale.setScalar(1.15);
+  g.add(handset);
+  // El cable en espiral, del micrófono a la caja.
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 120; i++) {
+    const k = i / 120;
+    const a = k * Math.PI * 2 * 14;
+    pts.push(new THREE.Vector3(0.12 - k * 0.1 + Math.cos(a) * 0.012, -0.12 - Math.sin(k * Math.PI) * 0.14, 0.07 + Math.sin(a) * 0.012));
+  }
+  const cord = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 240, 0.004, 5), black);
+  g.add(cord);
+  const lamp = new THREE.MeshStandardMaterial({ color: 0x1a0806, emissive: 0xff3a1a, emissiveIntensity: 0 });
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 6), lamp);
+  bulb.position.set(-0.04, 0.09, 0.065);
+  g.add(bulb);
+  return { group: g, handset, lamp };
+}
+
 /** Un cartel pintado a plantilla en la pared. */
 export function stencil(text: string, width: number, color = "rgba(30,28,24,0.82)", size = 120): THREE.Mesh {
   const w = 1024;

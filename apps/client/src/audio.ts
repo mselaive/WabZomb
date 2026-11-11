@@ -426,6 +426,32 @@ export class Audio {
     this.noise(0.03, 3200, 0.05, 0, "highpass");
   }
 
+  /** El timbre de un teléfono viejo: dos campanitas que repiquetean un segundo y medio. */
+  phoneRing(x: number, z: number): void {
+    if (!this.ctx) return;
+    const { gain, pan } = this.spatial(x, z, 22);
+    if (gain <= 0.01) return;
+    for (let i = 0; i < 24; i++) {
+      this.tone(i % 2 ? 1180 : 1420, 0.045, 0.05 * gain, pan, "square", undefined, i * 0.062);
+    }
+  }
+
+  /** Un cuerpo que revienta: un golpe húmedo y pedazos que caen. */
+  gore(x: number, z: number): void {
+    if (!this.ctx) return;
+    const { gain, pan } = this.spatial(x, z, 25);
+    if (gain <= 0.01) return;
+    this.noise(0.18, 900, 0.32 * gain, pan, "lowpass");
+    this.tone(70, 0.22, 0.2 * gain, pan, "sine", 38);
+    for (let i = 0; i < 4; i++) this.tone(180 + Math.random() * 120, 0.05, 0.05 * gain, pan, "triangle", 90, 0.25 + i * 0.09 + Math.random() * 0.05);
+  }
+
+  /** Levantar el tubo: el clic del gancho y la estática de la línea. */
+  phonePick(): void {
+    this.tone(900, 0.03, 0.06, 0, "square", 600);
+    this.noise(0.9, 2400, 0.04, 0, "bandpass", 0.8);
+  }
+
   /** Una palanca grande que baja, con el golpe de la corriente. */
   breaker(): void {
     this.noise(0.1, 1200, 0.24, 0);

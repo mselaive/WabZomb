@@ -65,6 +65,9 @@ import { PERK_DOUBLETAP, PERK_JUGG, PERK_MULE, PERK_QUICK, PERK_SPEED, PERK_STAM
  * zombis no saltan, así que nada que necesite un salto se puede pisar.
  */
 
+/** Dónde están los mostradores de la sala de visitas (en X; van de -0,2 a 0,2 en Z). */
+const VISIT_BOOTHS = [33, 36, 44, 47];
+
 const TIER = 2.8;
 const PITCH = 1.92;
 const DEPTH = 2.6;
@@ -770,9 +773,10 @@ function build(): GameMap {
   furn(31, -15.6, 33, -14.8, 0, 1.9, TEX_R_STEELGREEN);
   furn(47, -15.6, 49.4, -15, 0, 2.2, TEX_R_PLANKS);
   prop("clock", 40, 3.1, -15.95, 0, 1.4);
-  // Sala de visitas: el vidrio con los teléfonos, partida al medio.
-  for (const x of [33, 36, 44, 47]) {
-    furn(x - 1, -0.2, x + 1, 0.2, 0, 1.0, TEX_R_STEEL);
+  // Sala de visitas: los mostradores con el vidrio y un teléfono de cada lado (el vidrio y los
+  // teléfonos los arma el cliente arriba de cada mostrador).
+  for (const x of VISIT_BOOTHS) {
+    furn(x - 1, -0.2, x + 1, 0.2, 0, 1.0, TEX_R_STEELGREEN);
   }
   // Armería: racks y cajones.
   furn(31.2, 6, 32.4, 15, 0, 1.2, TEX_R_RUST);
@@ -1054,6 +1058,7 @@ function build(): GameMap {
         { name: "la llave de Michigan", x: 8, y: 0, z: -15.36, h: 1.5 },
         { name: "la llave de Times Square", x: -30.92, y: 0, z: 14.5, h: 1.5 },
       ],
+      phones: VISIT_BOOTHS.flatMap((x) => [-1, 1].map((side) => ({ name: "el teléfono", x, y: 0, z: side * 0.45, h: 1.35 }))),
       axe: { name: "el hacha de incendios", x: -60.9, y: 0, z: 8, h: 1.5 },
       notes: {
         radios: [

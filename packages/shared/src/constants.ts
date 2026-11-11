@@ -22,7 +22,7 @@ export const LAG_COMP_MAX_TICKS = 12;
 export const TRAIL_LENGTH = 16;
 
 /** Sube cuando el cliente y el servidor dejan de entenderse (ver el README). */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** Se puede jugar solo. Cuatro, como en el original. */
 export const MIN_PLAYERS = 1;
@@ -345,6 +345,10 @@ export const BREAKER_TICKS = 45 * TICK_RATE;
 /** Lo que tarda el horno en templar el trabuco. */
 export const FORGE_TICKS = 25 * TICK_RATE;
 /** Cuánta vida tiene el alcaide. */
+/** Los teléfonos de la sala de visitas: cuánto suena uno, y cada cuánto vuelve a sonar alguno. */
+export const PHONE_RING_TICKS = 25 * TICK_RATE;
+export const PHONE_GAP_TICKS = 150 * TICK_RATE;
+export const PHONE_FIRST_TICKS = 60 * TICK_RATE;
 export const BOSS_HP_MIN = 26_000;
 export const BOSS_HP_MAX = 55_000;
 export const BOSS_HP_PER_ROUND = 1500;

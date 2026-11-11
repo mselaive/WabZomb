@@ -249,6 +249,9 @@ export interface GameState {
   /** El horno templando el trabuco: cuánto falta, 0 si está listo, y para quién (-1, nada). */
   forgeTicks: number;
   forgeBy: number;
+  /** El teléfono de la sala de visitas que está sonando (-1, ninguno) y lo que falta para que corte o suene otro. */
+  phoneRing: number;
+  phoneTicks: number;
   /** Almas juntadas en el horno (zombis muertos cerca), hasta EGG_SOULS. */
   eggSouls: number;
   /** A qué ronda llegaron (cuando termina). */

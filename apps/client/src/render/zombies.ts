@@ -617,6 +617,34 @@ function wardenHalo(): THREE.Texture {
 }
 
 /** Un zombi caído donde cayó: se queda un rato y se hunde en el piso. */
+/**
+ * Un zombi en pedazos (para lo que lo revienta, como la Blundergat): la cabeza,
+ * el torso, brazos y piernas por separado, más unos trozos de carne. Cada pieza
+ * queda centrada en su origen; las acomoda y las tira el que las usa.
+ */
+export function buildZombieGibs(id: number): THREE.Mesh[] {
+  const m = materialsOf(id % LOOKS.length);
+  const meat = new THREE.MeshStandardMaterial({ color: 0x5a0d0b, roughness: 0.45, metalness: 0.05 });
+  const out = [
+    part(geo.skull, m.face),
+    part(geo.torso, m.shirt),
+    part(geo.thigh, m.pants),
+    part(geo.thigh, m.pants),
+    part(geo.shin, m.pants),
+    part(geo.shin, m.pants),
+    part(geo.upperArm, m.shirt),
+    part(geo.upperArm, m.shirt),
+    part(geo.foreArm, m.skin),
+    part(geo.foreArm, m.skin),
+  ];
+  out[1]!.scale.set(1.1, 1, 0.65);
+  for (let i = 0; i < 5; i++) {
+    const s = 0.06 + Math.random() * 0.07;
+    out.push(new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.8, s * 1.2), meat));
+  }
+  return out;
+}
+
 export function buildZombieCorpse(id: number, x: number, y: number, z: number, yaw: number): THREE.Group {
   const m = materialsOf(id % LOOKS.length);
   const g = new THREE.Group();

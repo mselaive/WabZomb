@@ -162,6 +162,14 @@ Se tira con **X**, rebota entre hasta 5 zombis y vuelve sola a los 7 segundos. N
 ### Thunder Gun
 La que se arma en el paso 4. Mejorada: Zeus Cannon.
 
+## Los teléfonos de la sala de visitas
+
+En administración, la sala del medio: cuatro mostradores con vidrio y un teléfono de cada lado.
+
+- **Levantar el tubo** de cualquiera, con **E**: una voz en la estática te dice qué sigue en la fuga.
+- Con la luz prendida, **cada tanto suena uno** (tiembla y se le prende una lucecita roja). Si lo
+  atendés antes de que corte, en unos 25 segundos, el que llama te deja un **power-up** al lado.
+
 ## Dónde está lo demás
 
 | Qué | Dónde |

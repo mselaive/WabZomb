@@ -442,7 +442,7 @@ export class GameRoom extends Server<Env> {
       radios: s.radios,
       egg: s.egg,
       souls: s.eggSouls,
-      q: [s.eggTicks, (s.egg & EGG_BUILT) !== 0 ? s.eggCode : -1, s.eggDial, s.breakers, s.breakerTicks, s.forgeTicks, s.forgeBy] as [number, number, number, number, number, number, number],
+      q: [s.eggTicks, (s.egg & EGG_BUILT) !== 0 ? s.eggCode : -1, s.eggDial, s.breakers, s.breakerTicks, s.forgeTicks, s.forgeBy, s.phoneRing] as [number, number, number, number, number, number, number, number],
       st: packStandings(s),
       reached: s.reachedRound,
       ...(this.events.length > 0 ? { ev: this.events } : {}),

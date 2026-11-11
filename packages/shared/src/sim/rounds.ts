@@ -1,4 +1,4 @@
-import { EGG_ESCAPED } from "../constants.js";
+import { EGG_ESCAPED, PHONE_FIRST_TICKS } from "../constants.js";
 import {
   BOARD_MAX,
   ENDED_TICKS,
@@ -107,6 +107,8 @@ export function startMatch(state: GameState, seed: number, map: GameMap, events:
   state.breakerTicks = 0;
   state.forgeTicks = 0;
   state.forgeBy = -1;
+  state.phoneRing = -1;
+  state.phoneTicks = PHONE_FIRST_TICKS;
   state.eggDial = 0;
   {
     const rng = state.rng ?? Math.random;

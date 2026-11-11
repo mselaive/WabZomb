@@ -5,7 +5,7 @@ import { SnapshotBuffer } from "./interpolation.js";
 /** Un zombi que camina en línea recta a 3 m/s, visto en el tick `tick`. */
 function snapshot(tick: number): SnapshotMsg {
   const z = { id: 1, type: 0, x: tick * 0.15, y: 0, z: 0, yaw: 0, state: 1, stateTicks: 0, hp: 100, maxHp: 100, vx: 3, vz: 0 } as unknown as ZombieState;
-  return { t: "s", tick, now: 0, phase: "playing", left: 0, rd: [1, 1, 0, 6, 1, 0], players: [], z: [packZombie(z)], doors: 0, boards: [], power: 0, box: [0, 0, 0, 0] as never, pap: [0, 0, 0, 0] as never, fx: [0, 0, 0, 0], radios: 0, egg: 0, souls: 0, q: [0, -1, 0, 0, 0, 0, 0], st: [], reached: 0 };
+  return { t: "s", tick, now: 0, phase: "playing", left: 0, rd: [1, 1, 0, 6, 1, 0], players: [], z: [packZombie(z)], doors: 0, boards: [], power: 0, box: [0, 0, 0, 0] as never, pap: [0, 0, 0, 0] as never, fx: [0, 0, 0, 0], radios: 0, egg: 0, souls: 0, q: [0, -1, 0, 0, 0, 0, 0, -1], st: [], reached: 0 };
 }
 
 /** Azar repetible. */

@@ -1,3 +1,4 @@
+import { PHONE_FIRST_TICKS, PHONE_GAP_TICKS, PHONE_RING_TICKS } from "../constants.js";
 import { ACT_AXE, ACT_GRENADE, ACT_NONE, EGG_BOSS_DEAD, EGG_BOSS_ON, bossHp, ZTYPE_BOSS, EGG_READY, EGG_FURNACE, EGG_SONG, EGG_SOULS, FALL_DAMAGE_PER_MS, FALL_SAFE_SPEED, MAX_HP, SOUL_RANGE, START_POINTS, TRAIL_LENGTH } from "../constants.js";
 import type { Box, GameMap } from "../map/types.js";
 import { M1911 } from "../weapons.js";
@@ -101,6 +102,8 @@ export function createGameState(): GameState {
     breakers: 0,
     breakerTicks: 0,
     forgeTicks: 0,
+    phoneRing: -1,
+    phoneTicks: PHONE_FIRST_TICKS,
     forgeBy: -1,
     reachedRound: 0,
     seed: 1,
@@ -184,6 +187,7 @@ export function step(state: GameState, inputs: ReadonlyMap<number, PlayerInput[]
 
   stepSouls(state, map, events, eventsBefore);
   stepQuestTimers(state, events);
+  stepPhones(state, map);
   stepSiege(state, map, events);
   stepRound(state, map, events);
 }
@@ -195,6 +199,27 @@ function stepQuestTimers(state: GameState, events: SimEvent[]): void {
     events.push({ t: "egg", byId: -1, step: 36 });
   }
   if (state.forgeTicks > 0 && --state.forgeTicks === 0) events.push({ t: "egg", byId: state.forgeBy, step: 39 });
+}
+
+/**
+ * Con la luz prendida, cada tanto suena un teléfono de la sala de visitas. Si
+ * nadie lo atiende, corta solo y al rato suena otro.
+ */
+function stepPhones(state: GameState, map: GameMap): void {
+  const phones = map.quest?.phones;
+  if (!phones || phones.length === 0 || !state.power) return;
+  if (state.phoneTicks > 0) {
+    state.phoneTicks--;
+    return;
+  }
+  const rng = state.rng ?? Math.random;
+  if (state.phoneRing >= 0) {
+    state.phoneRing = -1;
+    state.phoneTicks = PHONE_GAP_TICKS + Math.floor(rng() * PHONE_GAP_TICKS * 0.6);
+    return;
+  }
+  state.phoneRing = Math.floor(rng() * phones.length);
+  state.phoneTicks = PHONE_RING_TICKS;
 }
 
 /** El alcaide: aparece en el muelle cuando se abre la niebla. */

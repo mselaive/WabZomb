@@ -177,8 +177,8 @@ export interface SnapshotMsg {
   /** El easter egg (bits EGG_*) y las almas del horno. */
   egg: number;
   souls: number;
-  /** La fuga: asedio, combinación (-1 hasta que se pueda ver), ruedas, llaves de corte, tiempo de las llaves, horno, y para quién. */
-  q: [number, number, number, number, number, number, number];
+  /** La fuga: asedio, combinación (-1 hasta que se pueda ver), ruedas, llaves de corte, tiempo de las llaves, horno, para quién, y el teléfono que suena (-1). */
+  q: [number, number, number, number, number, number, number, number];
   st: SnapStanding[];
   /** A qué ronda llegaron (cuando terminó). */
   reached: number;

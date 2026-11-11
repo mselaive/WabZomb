@@ -21,6 +21,10 @@ interface Flash {
 }
 
 interface Shell {
+  /** Dónde está el piso para esto (las vainas, en 0). */
+  floor?: number;
+  /** Se achica al final de la vida en vez de desaparecer de golpe. */
+  shrink?: boolean;
   mesh: THREE.Mesh;
   vel: THREE.Vector3;
   spin: THREE.Vector3;
@@ -121,6 +125,26 @@ export class Effects {
       .add(new THREE.Vector3((Math.random() - 0.5) * 0.4, 1.6 + Math.random() * 0.6, (Math.random() - 0.5) * 0.4));
     this.shells.push({ mesh, vel, spin: new THREE.Vector3(Math.random() * 20, Math.random() * 20, Math.random() * 20), life: 1.2 });
     while (this.shells.length > 30) this.group.remove(this.shells.shift()!.mesh);
+  }
+
+  /**
+   * Un zombi reventado: los pedazos salen para `away` (hacia donde iba el tiro),
+   * giran, rebotan en el piso y se achican. Con `burning`, salen echando chispas.
+   */
+  gibs(parts: THREE.Mesh[], at: THREE.Vector3, away: THREE.Vector3, burning = false): void {
+    const r = () => Math.random();
+    for (const mesh of parts) {
+      mesh.position.set(at.x + (r() - 0.5) * 0.35, at.y + 0.5 + r() * 1.1, at.z + (r() - 0.5) * 0.35);
+      mesh.rotation.set(r() * 6, r() * 6, r() * 6);
+      mesh.userData.scale = mesh.scale.x;
+      this.group.add(mesh);
+      const speed = 1.8 + r() * 3.6;
+      const vel = new THREE.Vector3(away.x * speed + (r() - 0.5) * 2.4, 1.6 + r() * 3.4, away.z * speed + (r() - 0.5) * 2.4);
+      this.shells.push({ mesh, vel, spin: new THREE.Vector3((r() - 0.5) * 18, (r() - 0.5) * 18, (r() - 0.5) * 18), life: 5 + r(), floor: at.y + 0.05, shrink: true });
+    }
+    while (this.shells.length > 90) this.group.remove(this.shells.shift()!.mesh);
+    for (let i = 0; i < 4; i++) this.blood(new THREE.Vector3(at.x + away.x * i * 0.35, at.y + 0.6 + i * 0.25, at.z + away.z * i * 0.35), true);
+    if (burning) for (let i = 0; i < 3; i++) this.puff(new THREE.Vector3(at.x, at.y + 0.6 + i * 0.4, at.z), this.sparkMat, 0.6, 0.5, 1.4, 2.5);
   }
 
   /** Una explosión de HE: luz fuerte, bola de fuego, polvo y chispas. */
@@ -241,13 +265,15 @@ export class Effects {
         this.shells.splice(i, 1);
         continue;
       }
+      if (s.shrink && s.life < 1) s.mesh.scale.setScalar(Math.max(0.01, s.life) * (s.mesh.userData.scale ?? 1));
       s.vel.y -= 9.8 * dt;
       s.mesh.position.addScaledVector(s.vel, dt);
       s.mesh.rotation.x += s.spin.x * dt;
       s.mesh.rotation.y += s.spin.y * dt;
       // Al tocar el piso (aproximado) rebota un poco y se queda.
-      if (s.mesh.position.y < 0.01 && s.vel.y < 0) {
-        s.mesh.position.y = 0.01;
+      const floor = s.floor ?? 0.01;
+      if (s.mesh.position.y < floor && s.vel.y < 0) {
+        s.mesh.position.y = floor;
         s.vel.y = -s.vel.y * 0.3;
         s.vel.x *= 0.5;
         s.vel.z *= 0.5;

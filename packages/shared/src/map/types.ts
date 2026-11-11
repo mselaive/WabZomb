@@ -176,6 +176,8 @@ export interface Quest {
   breakers: QuestItem[];
   /** El hacha, en su caja de vidrio. */
   axe: QuestItem;
+  /** Los teléfonos de la sala de visitas: el que suena deja algo, los demás dan una pista. */
+  phones?: QuestItem[];
   notes: {
     radios: string[];
     /** Núcleo, bobina, gatillo, Thunder Gun armada. */

@@ -1,3 +1,5 @@
+import { PHONE_GAP_TICKS } from "../constants.js";
+import { dropPowerUp } from "./powerups.js";
 import {
   BOARD_MAX,
   BOARD_PAID_PER_ROUND,
@@ -275,12 +277,23 @@ export function findInteraction(state: GameState, p: PlayerState, map: GameMap):
 }
 
 /** Códigos de la fuga en `Interaction.id`: 0 la llave, 1 a 4 las piezas, 5 arreglar la lancha, 6 el faro, 7 subir. */
+/** Los teléfonos de la sala de visitas, en `Interaction.id`: PHONE_ID + cuál. */
+const PHONE_ID = 50;
+const PHONE_RANGE = 1.3;
+
 function findQuest(state: GameState, p: PlayerState, map: GameMap, near: (x: number, z: number, range?: number, y?: number) => boolean): Interaction | null {
   const q = map.quest;
   if (!q) return null;
   const e = state.egg;
   const info = (label: string, why: string): Interaction => ({ kind: "quest", id: -1, label, price: 0, ok: false, why, hold: false });
   const act = (id: number, label: string): Interaction => ({ kind: "quest", id, label, price: 0, ok: true, hold: false });
+
+  // Los teléfonos de la sala de visitas.
+  const phones = q.phones ?? [];
+  for (let i = 0; i < phones.length; i++) {
+    const ph = phones[i]!;
+    if (near(ph.x, ph.z, PHONE_RANGE, ph.y)) return act(PHONE_ID + i, state.phoneRing === i ? "Atender el teléfono" : "Levantar el tubo");
+  }
 
   // El hacha, en su caja de vidrio: se compra cuando se quiera.
   if (near(q.axe.x, q.axe.z, 1.7, q.axe.y) && !p.hasAxe) return { kind: "quest", id: 8, label: `Romper el vidrio: ${q.axe.name}`, price: AXE_PRICE, ok: p.points >= AXE_PRICE, why: p.points < AXE_PRICE ? "No te alcanza" : undefined, hold: false };
@@ -356,6 +369,18 @@ export function dialDigit(dial: number, wheel: number): number {
 function stepQuest(state: GameState, p: PlayerState, id: number, byId: number, map: GameMap, events: SimEvent[]): void {
   const q = map.quest;
   if (!q) return;
+  if (id >= PHONE_ID && id < PHONE_ID + (q.phones?.length ?? 0)) {
+    // El que suena deja algo del lado de la sala; los demás, una pista (la pone el cliente).
+    const i = id - PHONE_ID;
+    const ph = q.phones![i]!;
+    if (state.phoneRing === i) {
+      state.phoneRing = -1;
+      state.phoneTicks = PHONE_GAP_TICKS;
+      dropPowerUp(state, ph.x, ph.y, ph.z + Math.sign(ph.z) * 1.1, state.rng ?? Math.random, events);
+      events.push({ t: "egg", byId, step: 41 });
+    } else events.push({ t: "egg", byId, step: 42 });
+    return;
+  }
   if (id >= 20 && id <= 22) {
     // Una vuelta de la rueda; cuando las tres coinciden, se abre sola.
     const w = id - 20;

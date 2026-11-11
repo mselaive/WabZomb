@@ -34,6 +34,7 @@ import {
 } from "@wabzomb/shared";
 import { makeAllMaterials, makeChalkTexture, makeLabelTexture, makePuffTexture } from "./textures.js";
 import { RocaArt } from "./roca.js";
+import { buildVisitBooth, buildVisitPhone } from "./rocaProps.js";
 import { buildBoat, buildBreaker, buildFurnaceFront, buildPapMachine, buildQuestItem, buildSafe, buildWoodDoor, chalkDigit, furnaceEmbers, powerPanelFace, buildPerkCabinet, buildSteelDoor, buildWindowFrame } from "./rocaProps.js";
 import { buildAxeMesh, buildGrenadeMesh, buildWeaponMesh, setWeaponEnvironment } from "./viewmodel.js";
 
@@ -206,6 +207,7 @@ export class World {
   private furnaceMouth: THREE.Mesh | null = null;
   private furnaceLight: THREE.PointLight | null = null;
   private questItems: THREE.Group[] = [];
+  private phones: ReturnType<typeof buildVisitPhone>[] = [];
   private safe: ReturnType<typeof buildSafe> | null = null;
   private dialShown = -1;
   private breakers: ReturnType<typeof buildBreaker>[] = [];
@@ -734,6 +736,23 @@ export class World {
       this.propGroup.add(g);
       this.questItems.push(g);
     });
+    // La sala de visitas: un puesto por mostrador, y el teléfono de cada lado del vidrio.
+    this.phones = [];
+    const booths = new Set<number>();
+    for (const ph of q.phones ?? []) {
+      if (!booths.has(ph.x)) {
+        booths.add(ph.x);
+        const booth = buildVisitBooth(this.materials[25]!);
+        booth.position.set(ph.x, ph.y, 0);
+        this.propGroup.add(booth);
+      }
+      const phone = buildVisitPhone();
+      const side = Math.sign(ph.z) || 1;
+      phone.group.position.set(ph.x - 0.55 * side, ph.y + ph.h, side * 0.035);
+      phone.group.rotation.y = side > 0 ? 0 : Math.PI;
+      this.propGroup.add(phone.group);
+      this.phones.push(phone);
+    }
     const { group, lamp, engine } = buildBoat(wood, this.materials[25]!, iron);
     group.position.set(q.boat.x, (map.art?.seaY ?? -13) - 0.25, q.boat.z + 5.2);
     this.propGroup.add(group);
@@ -968,6 +987,18 @@ export class World {
     this.boardMeshes.forEach((list, i) => {
       const n = boards[i] ?? 0;
       list.forEach((m, k) => (m.visible = k < n));
+    });
+  }
+
+  /** El teléfono que suena tiembla en el gancho y prende la luz, de a ratos, como un timbre. */
+  updatePhones(ringing: number): void {
+    const t = performance.now() / 1000;
+    const on = t % 3 < 1.6;
+    this.phones.forEach((ph, i) => {
+      const live = i === ringing && on;
+      ph.handset.rotation.z = live ? Math.sin(t * 70) * 0.09 : 0;
+      ph.handset.position.y = live ? Math.abs(Math.sin(t * 35)) * 0.006 : 0;
+      ph.lamp.emissiveIntensity = i === ringing ? (live ? 3 : 0.6) : 0;
     });
   }
 

@@ -37,6 +37,8 @@ import {
   PERK_QUICK,
   PERK_SPEED,
   THUNDERGUN,
+  TRABUCO,
+  BRASAS,
   POWERUP_NAMES,
   SP_ID,
   ZOMBIE_HALF_W,
@@ -90,13 +92,22 @@ import { ViewModel, buildAxeMesh, muzzleOffset } from "./render/viewmodel.js";
 import { Post } from "./render/post.js";
 import { WardenAvatar } from "./render/zombies.js";
 import { World } from "./render/world.js";
-import { ZombieAvatar, buildZombieCorpse } from "./render/zombies.js";
+import { ZombieAvatar, buildZombieCorpse, buildZombieGibs } from "./render/zombies.js";
 import type { UI } from "./ui.js";
 
 const TRACER_MAX = 120;
 const LOBBY_CAMERA = new THREE.Vector3(0, 14, 30);
 /** Cuánto se quedan los zombis muertos en el piso (ms). */
 const CORPSE_MS = 12_000;
+
+/** Lo que dice el que llama a la sala de visitas cuando alguien atiende. */
+const PHONE_LINES = [
+  "—¿Arrieta? No... no sos él. Igual te dejé algo del lado de ustedes.",
+  "Una respiración, una risa, y alguien cuelga. Algo cayó detrás tuyo.",
+  "«Los que bajan al horno no vuelven. Tomá, por si acaso.»",
+  "Una voz de mujer: «Hace años que llamo a este número». Corta. Te dejó algo.",
+  "«El alcaide escucha todas las líneas. Rápido: agarrá lo que te dejé.»",
+];
 
 export class Game {
   private renderer!: THREE.WebGLRenderer;
@@ -386,6 +397,30 @@ export class Game {
   }
 
   /** Lo que sigue de la fuga, para la tabla: nada hasta que se la empieza. */
+  private nextRingAt = 0;
+
+  /** El teléfono que suena, con su timbre cada tres segundos. */
+  private updatePhones(now: number): void {
+    const ringing = this.questState[7] ?? -1;
+    this.world.updatePhones(ringing);
+    const ph = ringing >= 0 ? this.map.quest?.phones?.[ringing] : undefined;
+    if (!ph) {
+      this.nextRingAt = 0;
+      return;
+    }
+    if (now < this.nextRingAt) return;
+    this.nextRingAt = now + 3000;
+    this.audio.phoneRing(ph.x, ph.z);
+  }
+
+  /** Lo que se escucha al levantar un tubo que no sonaba: una pista de lo que sigue. */
+  private phoneHint(): string {
+    if (!this.shadow.power) return "Sin tono. La línea no tiene corriente: primero la luz, abajo en la ciudadela.";
+    const next = this.journalText().replace(/^La fuga: /, "");
+    if (!next) return "Estática, y muy lejos una voz: «Las radios. Buscá las radios viejas».";
+    return `Estática, y una voz cansada: «${next}»`;
+  }
+
   private journalText(): string {
     const q = this.map.quest;
     if (!q) return "";
@@ -620,6 +655,21 @@ export class Game {
       }
       case "zkill": {
         const avatar = this.zombieAvatars.get(ev.zombieId);
+        if (ev.weapon === TRABUCO || ev.weapon === BRASAS) {
+          // La Blundergat lo revienta: los pedazos salen para el lado del tiro.
+          const from = ev.byId === this.myId ? this.camera.position : this.avatars.get(ev.byId)?.root.position;
+          const away = new THREE.Vector3(ev.x - (from?.x ?? ev.x), 0, ev.z - (from?.z ?? ev.z - 1));
+          if (away.lengthSq() < 1e-4) away.set(0, 0, 1);
+          away.normalize();
+          this.effects.gibs(buildZombieGibs(ev.zombieId), new THREE.Vector3(ev.x, ev.y, ev.z), away, ev.weapon === BRASAS);
+          this.audio.zombieDie(ev.x, ev.z);
+          this.audio.gore(ev.x, ev.z);
+          if (avatar) {
+            this.zombieGroup.remove(avatar.root);
+            this.zombieAvatars.delete(ev.zombieId);
+          }
+          return;
+        }
         const yaw = avatar ? avatar.root.rotation.y : Math.random() * 6;
         const corpse = buildZombieCorpse(ev.zombieId, ev.x, ev.y, ev.z, yaw);
         this.corpseGroup.add(corpse);
@@ -741,6 +791,18 @@ export class Game {
             }
             if (ev.step === 39) {
               this.ui.showBanner("El horno devolvió algo", "gold", 4000, "La Blundergat de brasas ya está lista.");
+              return;
+            }
+            if (ev.step === 41) {
+              this.audio.phonePick();
+              const line = PHONE_LINES[Math.floor(Math.random() * PHONE_LINES.length)]!;
+              this.ui.showBanner(ev.byId === this.myId ? "Atendiste" : `${this.ui.nameOf(ev.byId)} atendió`, "gold", 6000, line);
+              return;
+            }
+            if (ev.step === 42) {
+              if (ev.byId !== this.myId) return;
+              this.audio.phonePick();
+              this.ui.showBanner("El teléfono", "gold", 6000, this.phoneHint());
               return;
             }
             if (ev.step === 40) {
@@ -1055,6 +1117,7 @@ export class Game {
       this.world.updateBox(this.shadow.box, this.map, dt);
       this.world.updatePap(this.shadow.pap, dt);
       this.world.updateRadios(this.shadow.radios, this.shadow.songTicks > 0);
+      this.updatePhones(now);
       this.ui.setRound(frame.round.number, frame.round.phase, frame.round.total, frame.round.killed, frame.zombies.length);
       const soulsOn = (this.shadow.egg & EGG_SONG) !== 0 && (this.shadow.egg & EGG_FURNACE) === 0;
       const siege = this.shadow.eggTicks;
